@@ -28,7 +28,8 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const DEFAULT_SYSTEM_INSTRUCTION = `You are a professional booru tag expert for Stable Diffusion and ComfyUI. 
-Your task is to generate high-quality costume/clothing wildcards. 
+Your task is to generate high-quality costume/clothing with related pose wildcards.
+Each wildcard must contain pose tags relevant to the clothinhgg tags. 
 Each wildcard must be a single line of comma-separated booru tags.
 Example: "white_shirt, pleated_skirt, black_necktie, loafers, school_uniform"
 Provide exactly 5 distinct variations based on the user's request. 
@@ -40,7 +41,8 @@ export default function App() {
   const [numToGenerate, setNumToGenerate] = useState(12);
   const [totalCost, setTotalCost] = useState(0);
   const [lastCallCost, setLastCallCost] = useState(0);
-  const [generatedWildcards, setGeneratedWildcards] = useState<string[]>([]);
+  const [generatedWildcards, setGeneratedWildcards] = useState<{ text: string; createdAt: number }[]>([]);
+  const [lastGenerationTime, setLastGenerationTime] = useState<number>(0);
   const [savedWildcards, setSavedWildcards] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -51,17 +53,16 @@ export default function App() {
     const targetPrompt = prompt.trim() || "Generate random, creative, and unique costume/clothing booru tag wildcards. Surprise me with different styles (e.g., fantasy, sci-fi, historical, modern, avant-garde).";
     setIsLoading(true);
     
-    // If not refining, clear previous results to show fresh ones
-    if (!isRefining) {
-      setGeneratedWildcards([]);
-      setLastCallCost(0);
-    }
+    // Reset last call cost for the new session
+    setLastCallCost(0);
+    const generationTime = Date.now();
+    setLastGenerationTime(generationTime);
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const model = "gemini-3-flash-preview";
       
-      const totalNeeded = isRefining ? 1 : numToGenerate;
+      const totalNeeded = numToGenerate; // Always use count now
       const batchSize = 10;
       const batches: number[] = [];
       
@@ -70,11 +71,9 @@ export default function App() {
       }
 
       let sessionCost = 0;
-
+      
       for (const count of batches) {
-        const batchPrompt = isRefining 
-          ? `Refine this wildcard: "${prompt}". User request for refinement: ${userPrompt}. Output ONLY 1 line of booru tags.`
-          : `${targetPrompt} Provide exactly ${count} distinct variations. Output ONLY the wildcards, one per line.`;
+        const batchPrompt = `${targetPrompt} Provide exactly ${count} distinct variations. Output ONLY the wildcards, one per line.`;
 
         const response = await ai.models.generateContent({
           model,
@@ -98,11 +97,10 @@ export default function App() {
         const text = response.text || '';
         const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, count);
         
-        if (isRefining) {
-          setGeneratedWildcards(prev => [...lines, ...prev]);
-        } else {
-          setGeneratedWildcards(prev => [...prev, ...lines]);
-        }
+        const newItems = lines.map(l => ({ text: l, createdAt: generationTime }));
+        
+        // Update UI incrementally but prepend
+        setGeneratedWildcards(prev => [...newItems, ...prev]);
       }
       setLastCallCost(sessionCost);
     } catch (error) {
@@ -164,11 +162,14 @@ export default function App() {
   };
 
   const handleRefine = (wildcard: string) => {
-    if (!userPrompt.trim()) {
-      alert("Enter a refinement instruction in the 'Request' box first.");
-      return;
+    setUserPrompt(`${wildcard}\n\nRefine: `);
+    // Scroll to top of sidebar if needed, but usually just setting state is enough
+    const textarea = document.querySelector('textarea');
+    if (textarea) {
+      textarea.focus();
+      // Set cursor to end
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
-    generateWildcards(wildcard, true);
   };
 
   return (
@@ -334,12 +335,23 @@ export default function App() {
             <div className="max-w-6xl mx-auto p-10 space-y-8">
               <div className="flex items-center justify-between">
                 <h2 className="text-[10px] font-bold uppercase tracking-wider text-black/40">Generated Wildcards ({generatedWildcards.length})</h2>
-                {generatedWildcards.length > 0 && (
-                  <button onClick={() => generateWildcards(userPrompt)} className="text-[10px] font-bold text-black/40 hover:text-black flex items-center gap-1 transition-colors">
-                    <RefreshCw className="w-3 h-3" />
-                    Refresh
-                  </button>
-                )}
+                <div className="flex items-center gap-4">
+                  {generatedWildcards.length > 0 && (
+                    <button 
+                      onClick={() => setGeneratedWildcards([])} 
+                      className="text-[10px] font-bold text-black/40 hover:text-red-500 flex items-center gap-1 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear History
+                    </button>
+                  )}
+                  {generatedWildcards.length > 0 && (
+                    <button onClick={() => generateWildcards(userPrompt)} className="text-[10px] font-bold text-black/40 hover:text-black flex items-center gap-1 transition-colors">
+                      <RefreshCw className="w-3 h-3" />
+                      Refresh
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -353,23 +365,28 @@ export default function App() {
                       </div>
                     </motion.div>
                   ) : generatedWildcards.length > 0 ? (
-                    generatedWildcards.map((wildcard, idx) => (
+                    generatedWildcards.map((item, idx) => (
                       <motion.div 
-                        key={`${wildcard}-${idx}`}
+                        key={`${item.text}-${idx}`}
                         layout
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="group relative h-32 bg-white border border-black/5 hover:border-black/20 rounded-xl transition-all cursor-pointer overflow-hidden"
-                        onClick={() => handleCopy(wildcard, idx)}
+                        className={cn(
+                          "group relative h-32 bg-white border rounded-xl transition-all cursor-pointer overflow-hidden",
+                          item.createdAt === lastGenerationTime 
+                            ? "border-black/20 shadow-sm ring-1 ring-black/5" 
+                            : "border-black/5 hover:border-black/20"
+                        )}
+                        onClick={() => handleCopy(item.text, idx)}
                       >
                         {/* Content */}
                         <div className="p-4 h-full flex flex-col">
                           <p className="text-[11px] font-mono text-black/50 leading-relaxed line-clamp-4 group-hover:opacity-0 transition-opacity">
-                            {wildcard}
+                            {item.text}
                           </p>
                           <div className="absolute inset-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 backdrop-blur-[2px] overflow-y-auto custom-scrollbar">
                             <p className="text-[11px] font-mono text-black leading-relaxed">
-                              {wildcard}
+                              {item.text}
                             </p>
                           </div>
                         </div>
@@ -377,14 +394,14 @@ export default function App() {
                         {/* Actions */}
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button 
-                            onClick={(e) => { e.stopPropagation(); saveToSavedList(wildcard); }}
+                            onClick={(e) => { e.stopPropagation(); saveToSavedList(item.text); }}
                             className="p-1.5 bg-white border border-black/10 rounded-md hover:bg-black hover:text-white transition-all shadow-sm"
                             title="Save"
                           >
                             <Save className="w-3 h-3" />
                           </button>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); handleRefine(wildcard); }}
+                            onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
                             className="p-1.5 bg-white border border-black/10 rounded-md hover:bg-black hover:text-white transition-all shadow-sm"
                             title="Refine"
                           >
