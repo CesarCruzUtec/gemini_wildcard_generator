@@ -1,0 +1,5 @@
+{
+  "name": "Costume Wildcard Generator",
+  "description": "Generate and manage booru-style costume wildcards for ComfyUI using AI.",
+  "requestFramePermissions": []
+}
