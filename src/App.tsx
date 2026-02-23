@@ -116,6 +116,7 @@ const dbApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     }),
+  resetDb: () => fetch('/api/db/reset', { method: 'POST' }),
 };
 
 const DEFAULT_SYSTEM_INSTRUCTION = `You are an expert Danbooru tagger for Stable Diffusion and ComfyUI. Your task is to generate highly detailed, comprehensive wildcards describing full-body outfits.
@@ -255,6 +256,9 @@ export default function App() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryLoading, setGalleryLoading] = useState(true);
   const [previewHover, setPreviewHover] = useState<{ url: string; x: number; y: number } | null>(null);
+  const [clearGeneratedConfirm, setClearGeneratedConfirm] = useState(false);
+  const [clearSavedConfirm, setClearSavedConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -490,15 +494,15 @@ export default function App() {
   };
 
   const clearSaved = () => {
-    if (confirm('Clear all saved wildcards?')) {
-      setSavedWildcards([]);
-      dbApi.clearList('saved');
-    }
+    setSavedWildcards([]);
+    dbApi.clearList('saved');
+    setClearSavedConfirm(false);
   };
 
   const clearGenerated = () => {
     setGeneratedWildcards([]);
     dbApi.clearList('generated');
+    setClearGeneratedConfirm(false);
   };
 
   const downloadWildcards = () => {
@@ -626,6 +630,88 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Reset DB Confirmation Modal */}
+      <AnimatePresence>
+        {showResetConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowResetConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden"
+              style={{ backgroundColor: theme.card, color: theme.text }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b flex items-center gap-3" style={{ borderColor: theme.border }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 shrink-0">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold">Reset Database</h2>
+                  <p className="text-[10px] opacity-40 mt-0.5">This cannot be undone</p>
+                </div>
+              </div>
+              <div className="p-6 space-y-3">
+                <p className="text-xs opacity-60 leading-relaxed">The following will be permanently deleted:</p>
+                <ul className="space-y-2">
+                  <li className="flex items-center justify-between text-xs rounded-lg px-3 py-2" style={{ backgroundColor: theme.input }}>
+                    <span className="opacity-60">Generated wildcards</span>
+                    <span className="font-bold font-mono">{generatedWildcards.length}</span>
+                  </li>
+                  <li className="flex items-center justify-between text-xs rounded-lg px-3 py-2" style={{ backgroundColor: theme.input }}>
+                    <span className="opacity-60">Saved wildcards</span>
+                    <span className="font-bold font-mono">{savedWildcards.length}</span>
+                  </li>
+                  <li className="flex items-center justify-between text-xs rounded-lg px-3 py-2" style={{ backgroundColor: theme.input }}>
+                    <span className="opacity-60">All-time API cost</span>
+                    <span className="font-bold font-mono">${allTimeCost.toFixed(6)}</span>
+                  </li>
+                  <li className="flex items-center justify-between text-xs rounded-lg px-3 py-2" style={{ backgroundColor: theme.input }}>
+                    <span className="opacity-60">API key &amp; gallery path</span>
+                    <span className="font-bold font-mono opacity-60">cleared</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="px-6 pb-6 flex gap-3">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="flex-1 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
+                  style={{ backgroundColor: theme.input }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await dbApi.resetDb();
+                    setGeneratedWildcards([]);
+                    setSavedWildcards([]);
+                    setAllTimeCost(0);
+                    setSessionCost(0);
+                    setLastCallCost(0);
+                    setApiKey(''); setApiKeyInput('');
+                    setGalleryPath(''); setGalleryPathInput('');
+                    setGalleryFiles([]);
+                    sessionIdRef.current = null;
+                    sessionCostRef.current = 0;
+                    setShowResetConfirm(false);
+                    setShowSettings(false);
+                  }}
+                  className="flex-1 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Reset Everything
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Tutorial Modal */}
       <AnimatePresence>
@@ -838,13 +924,19 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
+                <div className="pt-4 border-t flex flex-col gap-2" style={{ borderColor: theme.border }}>
                   <button
                     onClick={() => setShowSettings(false)}
                     className="w-full h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
                     style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
                   >
                     Close Settings
+                  </button>
+                  <button
+                    onClick={() => setShowResetConfirm(true)}
+                    className="w-full h-9 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/30 text-red-500/60 hover:text-red-500 hover:border-red-500/60 hover:bg-red-500/5"
+                  >
+                    Reset Database
                   </button>
                 </div>
               </div>
@@ -1073,14 +1165,37 @@ export default function App() {
           <div className="flex-1 flex overflow-hidden">
             {/* Generated Section */}
             <div className="flex-1 flex flex-col border-r overflow-hidden" style={{ borderColor: theme.border }}>
-              <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
-                <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Generated ({filteredGenerated.length})</h2>
-                <button
-                  onClick={() => clearGenerated()}
-                  className="flex items-center gap-1.5 px-2 py-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100 text-[10px] font-medium"
-                >
-                  <Trash2 className="w-3 h-3" /> Clear
-                </button>
+              <div className="border-b shrink-0" style={{ borderColor: theme.border }}>
+                <div className="p-4 flex items-center justify-between">
+                  <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Generated ({filteredGenerated.length})</h2>
+                  <button
+                    onClick={() => setClearGeneratedConfirm(true)}
+                    disabled={generatedWildcards.length === 0}
+                    className="flex items-center gap-1.5 px-2 py-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] font-medium"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear
+                  </button>
+                </div>
+                <AnimatePresence>
+                  {clearGeneratedConfirm && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-4 pb-3 flex items-center justify-between gap-3 border-t pt-3" style={{ borderColor: theme.border }}>
+                        <p className="text-[10px] opacity-60 leading-tight">
+                          Delete <span className="font-bold text-red-500">{generatedWildcards.length} wildcard{generatedWildcards.length !== 1 ? 's' : ''}</span> permanently?
+                        </p>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => setClearGeneratedConfirm(false)} className="px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors" style={{ backgroundColor: theme.input }}>Cancel</button>
+                          <button onClick={clearGenerated} className="px-2.5 py-1 rounded-md text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">Delete all</button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 <Reorder.Group
@@ -1186,20 +1301,37 @@ export default function App() {
 
             {/* Saved Section */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
-                <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Saved ({filteredSaved.length})</h2>
-                <div className="flex gap-1">
-                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-2 py-1 opacity-40 hover:opacity-100 rounded-md hover:bg-black/5 transition-colors text-[10px] font-medium">
-                    <Upload className="w-3 h-3" /> Import
-                  </button>
-                  <button onClick={downloadWildcards} className="flex items-center gap-1.5 px-2 py-1 opacity-40 hover:opacity-100 rounded-md hover:bg-black/5 transition-colors text-[10px] font-medium">
-                    <Download className="w-3 h-3" /> Export
-                  </button>
-                  <button onClick={clearSaved} className="flex items-center gap-1.5 px-2 py-1 opacity-40 hover:opacity-100 hover:text-red-500 rounded-md hover:bg-black/5 transition-colors text-[10px] font-medium">
+              <div className="border-b shrink-0" style={{ borderColor: theme.border }}>
+                <div className="p-4 flex items-center justify-between">
+                  <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Saved ({filteredSaved.length})</h2>
+                  <button
+                    onClick={() => setClearSavedConfirm(true)}
+                    disabled={savedWildcards.length === 0}
+                    className="flex items-center gap-1.5 px-2 py-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] font-medium"
+                  >
                     <Trash2 className="w-3 h-3" /> Clear
                   </button>
-                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt" />
                 </div>
+                <AnimatePresence>
+                  {clearSavedConfirm && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-4 pb-3 flex items-center justify-between gap-3 border-t pt-3" style={{ borderColor: theme.border }}>
+                        <p className="text-[10px] opacity-60 leading-tight">
+                          Delete <span className="font-bold text-red-500">{savedWildcards.length} wildcard{savedWildcards.length !== 1 ? 's' : ''}</span> permanently?
+                        </p>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => setClearSavedConfirm(false)} className="px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors" style={{ backgroundColor: theme.input }}>Cancel</button>
+                          <button onClick={clearSaved} className="px-2.5 py-1 rounded-md text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">Delete all</button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 <Reorder.Group

@@ -234,6 +234,18 @@ app.patch('/api/costs/total', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── POST /api/db/reset ────────────────────────────────────────────────────────
+app.post('/api/db/reset', (_req, res) => {
+  db.transaction(() => {
+    db.prepare('DELETE FROM wildcards').run();
+    db.prepare('DELETE FROM costs').run();
+    db.prepare(`INSERT INTO costs (id, type, label, amount, created_at) VALUES ('__total__', 'total', 'All-Time Total', 0, ?)`).run(Date.now());
+    db.prepare(`UPDATE config SET value = '' WHERE key = 'api_key'`).run();
+    db.prepare(`UPDATE config SET value = '' WHERE key = 'gallery_dir'`).run();
+  })();
+  res.json({ ok: true });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Gallery + Wildcards server → http://localhost:${PORT}`);
