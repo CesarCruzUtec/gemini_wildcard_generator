@@ -37,6 +37,7 @@ interface Props {
   onSave?: (item: WildcardItem) => void;
   onRefine: (text: string) => void;
   onSetPreview: (id: string, url: string) => void;
+  onRemovePreview: (id: string) => void;
   onRemove: (id: string) => void;
   onHoverChange: (url: string | null, x?: number, y?: number, side?: 'left' | 'right') => void;
   previewSide?: 'left' | 'right';
@@ -64,6 +65,7 @@ export function WildcardList({
   onSave,
   onRefine,
   onSetPreview,
+  onRemovePreview,
   onRemove,
   onHoverChange,
   previewSide = 'right',
@@ -208,6 +210,7 @@ export function WildcardList({
                         onSave={onSave ? () => onSave(safeItems[vRow.index]) : undefined}
                         onRefine={() => onRefine(safeItems[vRow.index].text)}
                         onSetPreview={() => onSetPreview(safeItems[vRow.index].id, currentGalleryImageUrl)}
+                        onRemovePreview={() => onRemovePreview(safeItems[vRow.index].id)}
                         onRemove={() => onRemove(safeItems[vRow.index].id)}
                         onHoverChange={onHoverChange}
                         previewSide={previewSide}

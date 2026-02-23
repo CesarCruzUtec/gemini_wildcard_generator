@@ -224,6 +224,12 @@ export default function App() {
     dbApi.patch(id, { previewUrl: imageUrl });
   };
 
+  const removePreviewForWildcard = (id: string, listType: 'generated' | 'saved') => {
+    if (listType === 'generated') generatedList.update(id, { previewUrl: undefined });
+    else savedList.update(id, { previewUrl: undefined });
+    dbApi.patch(id, { previewUrl: null });
+  };
+
   const removeSaved = (id: string) => {
     savedList.remove(id);
     dbApi.remove(id);
@@ -437,6 +443,7 @@ export default function App() {
                 onSave={saveToSavedList}
                 onRefine={(text) => setRefiningWildcard(text)}
                 onSetPreview={(id, url) => setPreviewForWildcard(id, url, 'generated')}
+                onRemovePreview={(id) => removePreviewForWildcard(id, 'generated')}
                 onRemove={removeGenerated}
                 onHoverChange={handleHoverChange}
                 previewSide="right"
@@ -464,6 +471,7 @@ export default function App() {
                 onCopy={handleCopy}
                 onRefine={(text) => setRefiningWildcard(text)}
                 onSetPreview={(id, url) => setPreviewForWildcard(id, url, 'saved')}
+                onRemovePreview={(id) => removePreviewForWildcard(id, 'saved')}
                 onRemove={removeSaved}
                 onHoverChange={handleHoverChange}
                 previewSide="left"

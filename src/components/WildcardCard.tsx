@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Save, Sparkles, Image as ImageIcon, Trash2, Check } from 'lucide-react';
+import { Save, Sparkles, Image as ImageIcon, Trash2, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Theme, WildcardItem } from '../types';
 import { cn } from '../utils/cn';
@@ -23,6 +23,7 @@ interface Props {
   onSave?: () => void;
   onRefine: () => void;
   onSetPreview: () => void;
+  onRemovePreview: () => void;
   onRemove: () => void;
   onHoverChange: (url: string | null, x?: number, y?: number, side?: 'left' | 'right') => void;
   /** Which side of the card to show the preview popup. Default: 'right' */
@@ -41,6 +42,7 @@ export function WildcardCard({
   onSave,
   onRefine,
   onSetPreview,
+  onRemovePreview,
   onRemove,
   onHoverChange,
   previewSide = 'right',
@@ -72,10 +74,17 @@ export function WildcardCard({
       {/* Linked preview thumbnail */}
       {hasPreview && (
         <div
-          className="absolute top-2 right-2 w-8 h-8 rounded-md overflow-hidden border z-10 opacity-70 pointer-events-none"
+          className="absolute top-2 right-2 w-8 h-8 rounded-md overflow-hidden border z-10 opacity-70 group-hover:opacity-100 transition-opacity"
           style={{ borderColor: theme.border }}
         >
           <img src={item.previewUrl} className="w-full h-full object-cover" alt="preview" />
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemovePreview(); }}
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white"
+            title="Remove preview"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
