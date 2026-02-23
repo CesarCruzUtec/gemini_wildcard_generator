@@ -53,7 +53,7 @@ export function WildcardCard({
   return (
     <div
       className={cn(
-        'group relative border rounded-xl transition-colors overflow-hidden',
+        'group relative border rounded-xl transition-colors overflow-hidden flex flex-row',
         isHighlighted && 'ring-1',
       )}
       style={{
@@ -61,7 +61,6 @@ export function WildcardCard({
         borderColor: isHighlighted ? theme.accent : theme.border,
         '--tw-ring-color': theme.accent,
       } as React.CSSProperties}
-      onClick={onCopy}
       onMouseEnter={(e) => {
         if (item.previewUrl) {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -71,68 +70,80 @@ export function WildcardCard({
       }}
       onMouseLeave={() => onHoverChange(null)}
     >
-      {/* Linked preview thumbnail */}
+      {/* Left: text + buttons */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Text — clicking copies */}
+        <div className="p-3 pb-2 flex-1 cursor-pointer" onClick={onCopy}>
+          <p className="text-[11px] font-mono opacity-60 leading-relaxed whitespace-pre-wrap break-words">
+            {item.text}
+          </p>
+        </div>
+
+        {/* Action buttons — always visible */}
+        <div
+          className="flex flex-wrap gap-1 px-3 pb-3 border-t pt-2"
+          style={{ borderColor: theme.border }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onSave && (
+            <button
+              onClick={onSave}
+              className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors"
+              style={{ backgroundColor: theme.input, borderColor: theme.border }}
+            >
+              <Save className="w-3 h-3" /> Save
+            </button>
+          )}
+          <button
+            onClick={onRefine}
+            className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors"
+            style={{ backgroundColor: theme.input, borderColor: theme.border }}
+          >
+            <Sparkles className="w-3 h-3" /> Refine
+          </button>
+          <button
+            onClick={onSetPreview}
+            disabled={!galleryEnabled || galleryEmpty}
+            className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors disabled:opacity-20"
+            style={{
+              backgroundColor: hasPreview ? theme.accent : theme.input,
+              borderColor: hasPreview ? theme.accent : theme.border,
+              color: hasPreview ? (theme.id === 'dark' ? '#000' : '#fff') : undefined,
+            }}
+          >
+            <ImageIcon className="w-3 h-3" /> Preview
+          </button>
+          <button
+            onClick={onRemove}
+            className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors hover:text-red-500"
+            style={{ backgroundColor: theme.input, borderColor: theme.border }}
+          >
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+        </div>
+      </div>
+
+      {/* Right: full-height preview thumbnail */}
       {hasPreview && (
         <div
-          className="absolute top-2 right-2 w-8 h-8 rounded-md overflow-hidden border z-10 opacity-70 group-hover:opacity-100 transition-opacity"
+          className="relative shrink-0 w-20 border-l"
           style={{ borderColor: theme.border }}
         >
-          <img src={item.previewUrl} className="w-full h-full object-cover" alt="preview" />
+          <img
+            src={item.previewUrl}
+            className="absolute inset-0 w-full h-full object-cover"
+            alt="preview"
+          />
+          {/* Remove preview button */}
           <button
             onClick={(e) => { e.stopPropagation(); onRemovePreview(); }}
-            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white"
+            className="absolute top-1 right-1 p-0.5 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
             title="Remove preview"
           >
             <X className="w-3 h-3" />
           </button>
         </div>
       )}
-
-      {/* Text */}
-      <div className="p-4">
-        <p className="text-[11px] font-mono opacity-60 leading-relaxed whitespace-pre-wrap break-words">
-          {item.text}
-        </p>
-      </div>
-
-      {/* Action buttons (visible on hover) */}
-      <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        {onSave && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onSave(); }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium"
-            style={{ backgroundColor: theme.card, borderColor: theme.border }}
-          >
-            <Save className="w-3 h-3" /> Save
-          </button>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onRefine(); }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium"
-          style={{ backgroundColor: theme.card, borderColor: theme.border }}
-        >
-          <Sparkles className="w-3 h-3" /> Refine
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onSetPreview(); }}
-          disabled={!galleryEnabled || galleryEmpty}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium disabled:opacity-20"
-          style={{
-            backgroundColor: hasPreview ? theme.accent : theme.card,
-            borderColor: hasPreview ? theme.accent : theme.border,
-            color: hasPreview ? (theme.id === 'dark' ? '#000' : '#fff') : undefined,
-          }}
-        >
-          <ImageIcon className="w-3 h-3" /> Preview
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium hover:text-red-500"
-          style={{ backgroundColor: theme.card, borderColor: theme.border }}
-        >
-          <Trash2 className="w-3 h-3" /> Delete
-        </button>
-      </div>
 
       {/* Copied overlay */}
       <AnimatePresence>
