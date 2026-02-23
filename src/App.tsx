@@ -5,14 +5,14 @@
 
 import React, { useState, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { 
-  Download, 
-  Upload, 
-  RefreshCw, 
-  Trash2, 
-  Copy, 
-  Check, 
-  Sparkles, 
+import {
+  Download,
+  Upload,
+  RefreshCw,
+  Trash2,
+  Copy,
+  Check,
+  Sparkles,
   Settings2,
   FileText,
   Save,
@@ -32,13 +32,16 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const DEFAULT_SYSTEM_INSTRUCTION = `You are a professional booru tag expert for Stable Diffusion and ComfyUI. 
-Your task is to generate high-quality wildcards with costume/clothing, realted colors and related pose.
-Each wildcard must contain pose tags relevant to the clothinhg tags as well as tag colors for each piece of cloth if needed. 
-Each wildcard must be a single line of comma-separated booru tags.
-Example: "white_shirt, pleated_skirt, black_necktie, loafers, school_uniform"
-Provide exactly 5 distinct variations based on the user's request. 
-Output ONLY the wildcards, one per line. Do not include numbering, labels, or any other text.`;
+const DEFAULT_SYSTEM_INSTRUCTION = `You are an expert Danbooru tagger for Stable Diffusion and ComfyUI. Your task is to generate highly detailed, comprehensive wildcards describing full-body outfits.
+When given a text request and-or image references, you must meticulously analyze it and tag EVERY piece of clothing from head to toe. Do not omit any garment. Ensure tops, outerwear, bottoms, legwear, footwear, and accessories are all explicitly included.
+Each wildcard must be a single line of comma-separated booru tags containing:
+At least 2-3 pose/posture tags relevant to the clothing style.
+Detailed clothing tags covering the entire body (Headwear/Accessories, Tops/Outerwear, Bottoms, Legwear, Footwear).
+Explicit color tags attached to EVERY clothing item (e.g., "white_shirt", "black_pleated_skirt").
+Provide the exact amount of variations based on the user's request.
+Output ONLY the wildcards, one per line. Do not include numbering, labels, or any other text.
+Example:
+standing, looking_at_viewer, hands_in_pockets, black_choker, white_crop_top, green_zip-up_hoodie, blue_denim_shorts, black_thighhighs, red_sneakers, casual_wear`;
 
 type Theme = {
   id: string;
@@ -206,7 +209,7 @@ export default function App() {
     setLastCallCost(0);
     const generationTime = Date.now();
     setLastGenerationTime(generationTime);
-    
+
     try {
       const keyToUse = customApiKey || process.env.GEMINI_API_KEY;
       if (!keyToUse) {
@@ -217,17 +220,17 @@ export default function App() {
       }
       const ai = new GoogleGenAI({ apiKey: keyToUse });
       const model = "gemini-3-flash-preview";
-      
+
       const totalNeeded = numToGenerate;
       const batchSize = 10;
       const batches: number[] = [];
-      
+
       for (let i = 0; i < totalNeeded; i += batchSize) {
         batches.push(Math.min(batchSize, totalNeeded - i));
       }
 
       let sessionCost = 0;
-      
+
       for (const count of batches) {
         let batchPrompt = `${userPrompt}. Provide exactly ${count} distinct variations. Output ONLY the wildcards, one per line.`;
         if (refiningWildcard) {
@@ -235,7 +238,7 @@ export default function App() {
         }
 
         const parts: any[] = [{ text: batchPrompt }];
-        
+
         referenceImages.forEach(img => {
           parts.push({
             inlineData: {
@@ -265,13 +268,13 @@ export default function App() {
 
         const text = response.text || '';
         const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, count);
-        
-        const newItems = lines.map(l => ({ 
+
+        const newItems = lines.map(l => ({
           id: Math.random().toString(36).substr(2, 9),
-          text: l, 
-          createdAt: generationTime 
+          text: l,
+          createdAt: generationTime
         }));
-        
+
         setGeneratedWildcards(prev => [...newItems, ...prev]);
       }
       setLastCallCost(sessionCost);
@@ -349,21 +352,21 @@ export default function App() {
     if (textarea) textarea.focus();
   };
 
-  const filteredGenerated = generatedWildcards.filter(w => 
+  const filteredGenerated = generatedWildcards.filter(w =>
     w.text.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
-  const filteredSaved = savedWildcards.filter(w => 
+
+  const filteredSaved = savedWildcards.filter(w =>
     w.text.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div 
+    <div
       className="h-screen flex flex-col font-sans overflow-hidden transition-colors duration-300"
       style={{ backgroundColor: theme.bg, color: theme.text }}
     >
       {/* Header */}
-      <header 
+      <header
         className="h-14 border-b flex items-center justify-between px-6 shrink-0 transition-colors duration-300"
         style={{ backgroundColor: theme.sidebar, borderColor: theme.border }}
       >
@@ -374,7 +377,7 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Theme</label>
-            <select 
+            <select
               value={theme.id}
               onChange={(e) => setTheme(THEMES.find(t => t.id === e.target.value) || THEMES[0])}
               className="bg-transparent text-[10px] font-bold uppercase tracking-wider border-none focus:ring-0 cursor-pointer"
@@ -385,7 +388,7 @@ export default function App() {
               ))}
             </select>
           </div>
-          <button 
+          <button
             onClick={() => setShowGuide(true)}
             className="p-2 rounded-md transition-colors hover:bg-black/5"
             style={{ color: theme.muted }}
@@ -393,12 +396,12 @@ export default function App() {
           >
             <HelpCircle className="w-4 h-4" />
           </button>
-          <button 
+          <button
             onClick={() => setShowSettings(!showSettings)}
             className="p-2 rounded-md transition-colors"
-            style={{ 
+            style={{
               backgroundColor: showSettings ? theme.input : 'transparent',
-              color: showSettings ? theme.accent : theme.muted 
+              color: showSettings ? theme.accent : theme.muted
             }}
           >
             <Settings2 className="w-4 h-4" />
@@ -409,14 +412,14 @@ export default function App() {
       {/* Tutorial Modal */}
       <AnimatePresence>
         {showGuide && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
             onClick={() => setShowGuide(false)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -433,7 +436,7 @@ export default function App() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              
+
               <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
                 <section className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">1. Generate</h3>
@@ -472,7 +475,7 @@ export default function App() {
               </div>
 
               <div className="p-6 border-t flex justify-end" style={{ borderColor: theme.border }}>
-                <button 
+                <button
                   onClick={() => setShowGuide(false)}
                   className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
                   style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
@@ -488,7 +491,7 @@ export default function App() {
       {/* Settings Overlay */}
       <AnimatePresence>
         {showSettings && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -499,19 +502,19 @@ export default function App() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">System Instructions</label>
-                  <button 
+                  <button
                     onClick={() => setSystemInstruction(DEFAULT_SYSTEM_INSTRUCTION)}
                     className="text-[10px] font-bold opacity-40 hover:opacity-100 transition-colors"
                   >
                     Reset to Default
                   </button>
                 </div>
-                <textarea 
+                <textarea
                   value={systemInstruction}
                   onChange={(e) => setSystemInstruction(e.target.value)}
                   className="w-full h-48 border-none rounded-xl p-4 text-xs font-mono focus:ring-1 transition-all resize-none"
-                  style={{ 
-                    backgroundColor: theme.input, 
+                  style={{
+                    backgroundColor: theme.input,
                     color: theme.text,
                     '--tw-ring-color': theme.accent
                   } as any}
@@ -522,20 +525,20 @@ export default function App() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Gemini API Key</label>
                   <div className="relative">
-                    <input 
+                    <input
                       type="password"
                       value={customApiKey}
                       onChange={(e) => setCustomApiKey(e.target.value)}
                       placeholder={process.env.GEMINI_API_KEY ? "Using environment key (••••••••)" : "Enter your API key..."}
                       className="w-full h-10 border-none rounded-lg px-4 text-xs focus:ring-1 transition-all pr-10"
-                      style={{ 
-                        backgroundColor: theme.input, 
+                      style={{
+                        backgroundColor: theme.input,
                         color: theme.text,
                         '--tw-ring-color': theme.accent
                       } as any}
                     />
                     {customApiKey && (
-                      <button 
+                      <button
                         onClick={() => setCustomApiKey('')}
                         className="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 hover:opacity-100 transition-opacity"
                       >
@@ -544,13 +547,13 @@ export default function App() {
                     )}
                   </div>
                   <p className="text-[9px] opacity-30 leading-relaxed">
-                    Your API key is stored only in your browser's memory for this session. 
+                    Your API key is stored only in your browser's memory for this session.
                     If left empty, the app will attempt to use the system default key.
                   </p>
                 </div>
 
                 <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
-                  <button 
+                  <button
                     onClick={() => setShowSettings(false)}
                     className="w-full h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
                     style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
@@ -566,7 +569,7 @@ export default function App() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Input & Saved */}
-        <aside 
+        <aside
           className="w-80 border-r flex flex-col shrink-0 transition-colors duration-300"
           style={{ backgroundColor: theme.sidebar, borderColor: theme.border }}
         >
@@ -576,14 +579,14 @@ export default function App() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Refining Card</label>
-                  <button 
+                  <button
                     onClick={() => setRefiningWildcard(null)}
                     className="text-[10px] font-bold text-red-500 opacity-60 hover:opacity-100 transition-opacity"
                   >
                     Clear
                   </button>
                 </div>
-                <div 
+                <div
                   className="p-3 rounded-xl border text-[11px] font-mono leading-relaxed shadow-sm relative group"
                   style={{ backgroundColor: theme.card, borderColor: theme.accent }}
                 >
@@ -599,15 +602,15 @@ export default function App() {
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Request</label>
-              <textarea 
+              <textarea
                 value={userPrompt}
                 onChange={(e) => setUserPrompt(e.target.value)}
                 placeholder="e.g., cyberpunk street wear..."
                 className="w-full h-24 border-none rounded-lg p-3 text-sm focus:ring-1 transition-all resize-none placeholder:opacity-20"
-                style={{ 
-                  backgroundColor: theme.input, 
+                style={{
+                  backgroundColor: theme.input,
                   color: theme.text,
-                  '--tw-ring-color': theme.accent 
+                  '--tw-ring-color': theme.accent
                 } as any}
               />
             </div>
@@ -615,27 +618,27 @@ export default function App() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Reference Images ({referenceImages.length}/4)</label>
-                <button 
+                <button
                   onClick={() => imageInputRef.current?.click()}
                   disabled={referenceImages.length >= 4}
                   className="p-1 hover:bg-black/5 rounded-md transition-colors disabled:opacity-10"
                 >
                   <Plus className="w-3 h-3" />
                 </button>
-                <input 
-                  type="file" 
-                  ref={imageInputRef} 
-                  onChange={handleImageUpload} 
-                  className="hidden" 
-                  accept="image/*" 
-                  multiple 
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  accept="image/*"
+                  multiple
                 />
               </div>
               <div className="grid grid-cols-4 gap-2">
                 {referenceImages.map((img, idx) => (
                   <div key={idx} className="relative aspect-square rounded-md overflow-hidden bg-black/5">
                     <img src={img} className="w-full h-full object-cover" />
-                    <button 
+                    <button
                       onClick={() => setReferenceImages(prev => prev.filter((_, i) => i !== idx))}
                       className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl-md"
                     >
@@ -645,18 +648,18 @@ export default function App() {
                 ))}
               </div>
             </div>
-            
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Count</label>
-              <input 
+              <input
                 type="number"
                 min="1"
                 max="100"
                 value={numToGenerate}
                 onChange={(e) => setNumToGenerate(parseInt(e.target.value) || 1)}
                 className="w-full h-9 border-none rounded-lg px-3 text-xs focus:ring-1 transition-all"
-                style={{ 
-                  backgroundColor: theme.input, 
+                style={{
+                  backgroundColor: theme.input,
                   color: theme.text,
                   '--tw-ring-color': theme.accent
                 } as any}
@@ -664,18 +667,18 @@ export default function App() {
             </div>
 
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={() => generateWildcards()}
                 disabled={isLoading || (!userPrompt.trim() && referenceImages.length === 0)}
                 className="flex-1 h-10 text-xs font-medium rounded-lg disabled:opacity-20 transition-all flex items-center justify-center gap-2"
-                style={{ 
-                  backgroundColor: theme.accent, 
-                  color: theme.id === 'dark' ? '#000' : '#fff' 
+                style={{
+                  backgroundColor: theme.accent,
+                  color: theme.id === 'dark' ? '#000' : '#fff'
                 }}
               >
                 {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Generate"}
               </button>
-              <button 
+              <button
                 onClick={() => { setUserPrompt(''); setReferenceImages([]); setRefiningWildcard(null); generateWildcards(); }}
                 disabled={isLoading}
                 className="w-10 h-10 rounded-lg transition-all flex items-center justify-center"
@@ -707,7 +710,7 @@ export default function App() {
           {/* Search Bar */}
           <div className="h-14 border-b flex items-center px-6 gap-4 shrink-0" style={{ borderColor: theme.border }}>
             <Search className="w-4 h-4 opacity-20" />
-            <input 
+            <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -722,7 +725,7 @@ export default function App() {
             <div className="flex-1 flex flex-col border-r overflow-hidden" style={{ borderColor: theme.border }}>
               <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
                 <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Generated ({filteredGenerated.length})</h2>
-                <button 
+                <button
                   onClick={() => setGeneratedWildcards([])}
                   className="p-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100"
                 >
@@ -730,15 +733,15 @@ export default function App() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                <Reorder.Group 
-                  axis="y" 
-                  values={filteredGenerated} 
+                <Reorder.Group
+                  axis="y"
+                  values={filteredGenerated}
                   onReorder={setGeneratedWildcards}
                   className="grid grid-cols-1 xl:grid-cols-2 gap-4"
                 >
                   <AnimatePresence mode="popLayout">
                     {filteredGenerated.map((item) => (
-                      <Reorder.Item 
+                      <Reorder.Item
                         key={item.id}
                         value={item}
                         layout
@@ -749,8 +752,8 @@ export default function App() {
                           "group relative h-32 border rounded-xl transition-all cursor-pointer overflow-hidden",
                           item.createdAt === lastGenerationTime ? "ring-1" : ""
                         )}
-                        style={{ 
-                          backgroundColor: theme.card, 
+                        style={{
+                          backgroundColor: theme.card,
                           borderColor: item.createdAt === lastGenerationTime ? theme.accent : theme.border,
                           '--tw-ring-color': theme.accent
                         } as any}
@@ -767,21 +770,21 @@ export default function App() {
                           </div>
                         </div>
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); saveToSavedList(item); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
                           >
                             <Save className="w-3 h-3" />
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
                           >
                             <Sparkles className="w-3 h-3" />
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); removeGenerated(item.id); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
@@ -791,7 +794,7 @@ export default function App() {
                         </div>
                         <AnimatePresence>
                           {copiedIndex === item.id && (
-                            <motion.div 
+                            <motion.div
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               exit={{ opacity: 0 }}
@@ -830,15 +833,15 @@ export default function App() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                <Reorder.Group 
-                  axis="y" 
-                  values={filteredSaved} 
+                <Reorder.Group
+                  axis="y"
+                  values={filteredSaved}
                   onReorder={setSavedWildcards}
                   className="grid grid-cols-1 xl:grid-cols-2 gap-4"
                 >
                   <AnimatePresence mode="popLayout">
                     {filteredSaved.map((item) => (
-                      <Reorder.Item 
+                      <Reorder.Item
                         key={item.id}
                         value={item}
                         layout
@@ -860,14 +863,14 @@ export default function App() {
                           </div>
                         </div>
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
                           >
                             <Sparkles className="w-3 h-3" />
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); removeSaved(item.id); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
@@ -877,7 +880,7 @@ export default function App() {
                         </div>
                         <AnimatePresence>
                           {copiedIndex === item.id && (
-                            <motion.div 
+                            <motion.div
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               exit={{ opacity: 0 }}
