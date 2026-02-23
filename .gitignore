@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+wildcards.db
+wildcards.db-wal
+wildcards.db-shm

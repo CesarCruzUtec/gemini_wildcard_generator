@@ -32,6 +32,53 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Persists state in localStorage and keeps it in sync
+function useLocalStorage<T>(key: string, defaultValue: T) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? JSON.parse(stored) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+  return [value, setValue] as const;
+}
+
+type WildcardItem = { id: string; text: string; createdAt: number; previewUrl?: string };
+
+// API helpers – fire-and-forget for optimistic updates
+const dbApi = {
+  fetchList: async (list: 'generated' | 'saved'): Promise<WildcardItem[]> => {
+    const res = await fetch(`/api/wildcards?list=${list}`);
+    return res.json();
+  },
+  add: (items: (WildcardItem & { list: string })[]) =>
+    fetch('/api/wildcards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    }),
+  patch: (id: string, patch: { list?: string; previewUrl?: string | null }) =>
+    fetch(`/api/wildcards/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }),
+  remove: (id: string) => fetch(`/api/wildcards/${id}`, { method: 'DELETE' }),
+  clearList: (list: 'generated' | 'saved') =>
+    fetch(`/api/wildcards?list=${list}`, { method: 'DELETE' }),
+  reorder: (list: 'generated' | 'saved', ids: string[]) =>
+    fetch('/api/wildcards/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ list, ids }),
+    }),
+};
+
 const DEFAULT_SYSTEM_INSTRUCTION = `You are an expert Danbooru tagger for Stable Diffusion and ComfyUI. Your task is to generate highly detailed, comprehensive wildcards describing full-body outfits.
 When given a text request and-or image references, you must meticulously analyze it and tag EVERY piece of clothing from head to toe. Do not omit any garment. Ensure tops, outerwear, bottoms, legwear, footwear, and accessories are all explicitly included.
 Each wildcard must be a single line of comma-separated booru tags containing:
@@ -139,23 +186,28 @@ const THEMES: Theme[] = [
 ];
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(THEMES[0]);
-  const [systemInstruction, setSystemInstruction] = useState(DEFAULT_SYSTEM_INSTRUCTION);
-  const [userPrompt, setUserPrompt] = useState('');
+  // ── Persisted in localStorage ────────────────────────────────────────────
+  const [themeId, setThemeId] = useLocalStorage('themeId', 'dark');
+  const [systemInstruction, setSystemInstruction] = useLocalStorage('systemInstruction', DEFAULT_SYSTEM_INSTRUCTION);
+  const [userPrompt, setUserPrompt] = useLocalStorage('userPrompt', '');
+  const [numToGenerate, setNumToGenerate] = useLocalStorage('numToGenerate', 5);
+  const [customApiKey, setCustomApiKey] = useLocalStorage('customApiKey', '');
+  const [referenceImages, setReferenceImages] = useLocalStorage<string[]>('referenceImages', []);
+
+  const theme = THEMES.find(t => t.id === themeId) ?? THEMES[1];
+
+  // ── Session-only state ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
-  const [numToGenerate, setNumToGenerate] = useState(5);
   const [totalCost, setTotalCost] = useState(0);
   const [lastCallCost, setLastCallCost] = useState(0);
-  const [generatedWildcards, setGeneratedWildcards] = useState<{ id: string; text: string; createdAt: number; previewUrl?: string }[]>([]);
-  const [savedWildcards, setSavedWildcards] = useState<{ id: string; text: string; createdAt: number; previewUrl?: string }[]>([]);
+  const [generatedWildcards, setGeneratedWildcards] = useState<WildcardItem[]>([]);
+  const [savedWildcards, setSavedWildcards] = useState<WildcardItem[]>([]);
   const [lastGenerationTime, setLastGenerationTime] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [customApiKey, setCustomApiKey] = useState('');
   const [showGuide, setShowGuide] = useState(false);
   const [refiningWildcard, setRefiningWildcard] = useState<string | null>(null);
-  const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryLoading, setGalleryLoading] = useState(true);
@@ -163,6 +215,17 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Load wildcards from DB on mount ──────────────────────────────────────
+  useEffect(() => {
+    Promise.all([dbApi.fetchList('generated'), dbApi.fetchList('saved')])
+      .then(([generated, saved]) => {
+        setGeneratedWildcards(generated);
+        setSavedWildcards(saved);
+      })
+      .catch(() => { /* server not running */ });
+  }, []);
+
+  // ── Poll gallery ─────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchGallery = async () => {
       try {
@@ -290,13 +353,14 @@ export default function App() {
         const text = response.text || '';
         const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, count);
 
-        const newItems = lines.map(l => ({
+        const newItems: WildcardItem[] = lines.map(l => ({
           id: Math.random().toString(36).substr(2, 9),
           text: l,
           createdAt: generationTime
         }));
 
         setGeneratedWildcards(prev => [...newItems, ...prev]);
+        dbApi.add(newItems.map(item => ({ ...item, list: 'generated' })));
       }
       setLastCallCost(sessionCost);
       setRefiningWildcard(null);
@@ -314,10 +378,12 @@ export default function App() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const saveToSavedList = (item: { id: string; text: string; createdAt: number; previewUrl?: string }) => {
-    if (!savedWildcards.find(s => s.text === item.text)) {
-      setSavedWildcards(prev => [item, ...prev]);
-    }
+  const saveToSavedList = (item: WildcardItem) => {
+    if (savedWildcards.find(s => s.text === item.text)) return;
+    // New ID so generated and saved rows don't conflict in the DB
+    const newItem: WildcardItem = { ...item, id: Math.random().toString(36).substr(2, 9) };
+    setSavedWildcards(prev => [newItem, ...prev]);
+    dbApi.add([{ ...newItem, list: 'saved' }]);
   };
 
   const setPreviewForWildcard = (id: string, imageUrl: string, listType: 'generated' | 'saved') => {
@@ -326,20 +392,29 @@ export default function App() {
     } else {
       setSavedWildcards(prev => prev.map(w => w.id === id ? { ...w, previewUrl: imageUrl } : w));
     }
+    dbApi.patch(id, { previewUrl: imageUrl });
   };
 
   const removeSaved = (id: string) => {
     setSavedWildcards(prev => prev.filter(s => s.id !== id));
+    dbApi.remove(id);
   };
 
   const removeGenerated = (id: string) => {
     setGeneratedWildcards(prev => prev.filter(s => s.id !== id));
+    dbApi.remove(id);
   };
 
   const clearSaved = () => {
-    if (confirm("Clear all saved wildcards?")) {
+    if (confirm('Clear all saved wildcards?')) {
       setSavedWildcards([]);
+      dbApi.clearList('saved');
     }
+  };
+
+  const clearGenerated = () => {
+    setGeneratedWildcards([]);
+    dbApi.clearList('generated');
   };
 
   const downloadWildcards = () => {
@@ -364,12 +439,13 @@ export default function App() {
     reader.onload = (e) => {
       const content = e.target?.result as string;
       const lines = content.split('\n').filter(line => line.trim().length > 0);
-      const newSaved = lines.map(l => ({
+      const newSaved: WildcardItem[] = lines.map(l => ({
         id: Math.random().toString(36).substr(2, 9),
         text: l,
         createdAt: Date.now()
       }));
       setSavedWildcards(prev => [...newSaved, ...prev]);
+      dbApi.add(newSaved.map(item => ({ ...item, list: 'saved' })));
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -419,8 +495,8 @@ export default function App() {
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Theme</label>
             <select
-              value={theme.id}
-              onChange={(e) => setTheme(THEMES.find(t => t.id === e.target.value) || THEMES[0])}
+              value={themeId}
+              onChange={(e) => setThemeId(e.target.value)}
               className="bg-transparent text-[10px] font-bold uppercase tracking-wider border-none focus:ring-0 cursor-pointer"
               style={{ color: theme.accent }}
             >
@@ -838,7 +914,7 @@ export default function App() {
               <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
                 <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Generated ({filteredGenerated.length})</h2>
                 <button
-                  onClick={() => setGeneratedWildcards([])}
+                  onClick={() => clearGenerated()}
                   className="p-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -848,7 +924,11 @@ export default function App() {
                 <Reorder.Group
                   axis="y"
                   values={filteredGenerated}
-                  onReorder={(reordered) => setGeneratedWildcards(prev => mergeReorder(prev, reordered))}
+                  onReorder={(reordered) => {
+                    const merged = mergeReorder(generatedWildcards, reordered);
+                    setGeneratedWildcards(merged);
+                    dbApi.reorder('generated', merged.map(w => w.id));
+                  }}
                   className="flex flex-col gap-4"
                 >
                   <AnimatePresence mode="popLayout">
@@ -967,7 +1047,11 @@ export default function App() {
                 <Reorder.Group
                   axis="y"
                   values={filteredSaved}
-                  onReorder={(reordered) => setSavedWildcards(prev => mergeReorder(prev, reordered))}
+                  onReorder={(reordered) => {
+                    const merged = mergeReorder(savedWildcards, reordered);
+                    setSavedWildcards(merged);
+                    dbApi.reorder('saved', merged.map(w => w.id));
+                  }}
                   className="flex flex-col gap-4"
                 >
                   <AnimatePresence mode="popLayout">
