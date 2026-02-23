@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { RefreshCw, FolderOpen, Image as ImageIcon } from 'lucide-react';
 import { Theme } from '../../types';
 import { cn } from '../../utils/cn';
+import { GalleryLightbox } from '../modals/GalleryLightbox';
 
 interface Props {
   theme: Theme;
@@ -29,6 +30,8 @@ export function GalleryViewer({
   onRefresh,
   onOpenSettings,
 }: Props) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   return (
     <div
       className="flex-1 flex flex-col p-4 gap-3 overflow-hidden border-t"
@@ -74,8 +77,10 @@ export function GalleryViewer({
       ) : (
         <>
           <div
-            className="flex-1 rounded-xl overflow-hidden relative"
+            className="flex-1 rounded-xl overflow-hidden relative cursor-zoom-in"
             style={{ backgroundColor: theme.input }}
+            onClick={() => setLightboxOpen(true)}
+            title="Click to expand"
           >
             <img
               key={galleryFiles[galleryIndex]}
@@ -106,6 +111,16 @@ export function GalleryViewer({
             </button>
           </div>
         </>
+      )}
+
+      {lightboxOpen && galleryFiles.length > 0 && (
+        <GalleryLightbox
+          theme={theme}
+          files={galleryFiles}
+          index={galleryIndex}
+          onClose={() => setLightboxOpen(false)}
+          onNavigate={(i) => { setGalleryIndex(i); }}
+        />
       )}
     </div>
   );
