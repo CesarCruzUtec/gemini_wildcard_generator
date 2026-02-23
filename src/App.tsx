@@ -21,7 +21,8 @@ import {
   X,
   Image as ImageIcon,
   Search,
-  ArrowRight
+  ArrowRight,
+  FolderOpen
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -102,6 +103,17 @@ const dbApi = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ delta }),
+    }),
+  // ── Config ──────────────────────────────────────────────────────────────────
+  fetchConfig: async (): Promise<{ galleryDir: string }> => {
+    const res = await fetch('/api/config');
+    return res.json();
+  },
+  updateConfig: (galleryDir: string) =>
+    fetch('/api/config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ galleryDir }),
     }),
 };
 
@@ -235,6 +247,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [refiningWildcard, setRefiningWildcard] = useState<string | null>(null);
+  const [galleryPath, setGalleryPath] = useState('');
+  const [galleryPathInput, setGalleryPathInput] = useState('');
   const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryLoading, setGalleryLoading] = useState(true);
@@ -265,10 +279,18 @@ export default function App() {
     dbApi.fetchCosts()
       .then(({ total }) => setAllTimeCost(total))
       .catch(() => {});
+    dbApi.fetchConfig()
+      .then(({ galleryDir }) => { setGalleryPath(galleryDir); setGalleryPathInput(galleryDir); })
+      .catch(() => {});
   }, []);
 
   // ── Poll gallery ─────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!galleryPath.trim()) {
+      setGalleryFiles([]);
+      setGalleryLoading(false);
+      return;
+    }
     const fetchGallery = async () => {
       try {
         const res = await fetch('/api/gallery');
@@ -283,7 +305,14 @@ export default function App() {
     fetchGallery();
     const id = setInterval(fetchGallery, 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [galleryPath]);
+
+  const galleryEnabled = galleryPath.trim() !== '';
+
+  // Sync settings input field whenever settings panel opens
+  useEffect(() => {
+    if (showSettings) setGalleryPathInput(galleryPath);
+  }, [showSettings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resizeImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -716,6 +745,55 @@ export default function App() {
                   </p>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Gallery Folder</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30" />
+                      <input
+                        type="text"
+                        value={galleryPathInput}
+                        onChange={(e) => setGalleryPathInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        placeholder="/path/to/ComfyUI/output"
+                        className="w-full h-10 border-none rounded-lg pl-8 pr-4 text-xs focus:ring-1 transition-all"
+                        style={{
+                          backgroundColor: theme.input,
+                          color: theme.text,
+                          '--tw-ring-color': theme.accent
+                        } as any}
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const trimmed = galleryPathInput.trim();
+                        setGalleryPath(trimmed);
+                        await dbApi.updateConfig(trimmed);
+                        if (trimmed) {
+                          setGalleryLoading(true);
+                          try {
+                            const res = await fetch('/api/gallery');
+                            const data = await res.json();
+                            setGalleryFiles(data.files ?? []);
+                            setGalleryIndex(0);
+                          } catch {} finally {
+                            setGalleryLoading(false);
+                          }
+                        } else {
+                          setGalleryFiles([]);
+                        }
+                      }}
+                      className="h-10 px-4 rounded-lg text-xs font-bold transition-all shrink-0"
+                      style={{ backgroundColor: theme.input, color: theme.accent }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  <p className="text-[9px] opacity-30 leading-relaxed">
+                    Absolute path to your image output folder (e.g. ComfyUI output directory). Leave empty to disable the gallery.
+                  </p>
+                </div>
+
                 <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
                   <button
                     onClick={() => setShowSettings(false)}
@@ -880,7 +958,18 @@ export default function App() {
               </div>
             </div>
 
-            {galleryLoading ? (
+            {!galleryEnabled ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center p-4" style={{ opacity: 0.3 }}>
+                <FolderOpen className="w-6 h-6" />
+                <span className="text-[10px] uppercase tracking-wider">No gallery folder set</span>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="text-[10px] underline underline-offset-2 mt-1"
+                >
+                  Configure in Settings
+                </button>
+              </div>
+            ) : galleryLoading ? (
               <div className="flex-1 flex items-center justify-center opacity-20">
                 <RefreshCw className="w-5 h-5 animate-spin" />
               </div>
@@ -1038,7 +1127,7 @@ export default function App() {
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPreviewForWildcard(item.id, `/gallery-images/${galleryFiles[galleryIndex]}`, 'generated'); }}
-                            disabled={galleryFiles.length === 0}
+                            disabled={!galleryEnabled || galleryFiles.length === 0}
                             className="p-1.5 border rounded-md transition-all shadow-sm disabled:opacity-20"
                             style={{ backgroundColor: item.previewUrl ? theme.accent : theme.card, borderColor: item.previewUrl ? theme.accent : theme.border, color: item.previewUrl ? (theme.id === 'dark' ? '#000' : '#fff') : undefined }}
                             title="Set current gallery image as preview"
@@ -1146,7 +1235,7 @@ export default function App() {
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPreviewForWildcard(item.id, `/gallery-images/${galleryFiles[galleryIndex]}`, 'saved'); }}
-                            disabled={galleryFiles.length === 0}
+                            disabled={!galleryEnabled || galleryFiles.length === 0}
                             className="p-1.5 border rounded-md transition-all shadow-sm disabled:opacity-20"
                             style={{ backgroundColor: item.previewUrl ? theme.accent : theme.card, borderColor: item.previewUrl ? theme.accent : theme.border, color: item.previewUrl ? (theme.id === 'dark' ? '#000' : '#fff') : undefined }}
                             title="Set current gallery image as preview"

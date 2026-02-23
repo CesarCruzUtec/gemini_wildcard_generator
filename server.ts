@@ -27,7 +27,6 @@ import Database from 'better-sqlite3';
 
 const app = express();
 const PORT = 3001;
-const GALLERY_DIR = '/mnt/data/ComfyUI/output';
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif']);
 const DB_PATH = path.join(process.cwd(), 'wildcards.db');
 
@@ -58,6 +57,23 @@ db.prepare(`
   VALUES ('__total__', 'total', 'All-Time Total', 0, ?)
 `).run(Date.now());
 
+// ── Config table ──────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS config (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+  );
+`);
+db.prepare(`INSERT OR IGNORE INTO config (key, value) VALUES ('gallery_dir', '')`).run();
+db.prepare(`INSERT OR IGNORE INTO config (key, value) VALUES ('api_key', '')`).run();
+
+function getConfigValue(key: string): string {
+  const row = db.prepare(`SELECT value FROM config WHERE key = ?`).get(key) as any;
+  return (row?.value as string) ?? '';
+}
+const getGalleryDir = () => getConfigValue('gallery_dir');
+const getApiKey = () => getConfigValue('api_key');
+
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -68,12 +84,31 @@ app.use((_req, res, next) => {
 app.options('*', (_req, res) => res.sendStatus(204));
 app.use(express.json());
 
-// ── Gallery ───────────────────────────────────────────────────────────────────
+// ── GET /api/config ──────────────────────────────────────────────────────────
+app.get('/api/config', (_req, res) => {
+  res.json({ galleryDir: getGalleryDir(), apiKey: getApiKey() });
+});
+
+// ── PATCH /api/config ─────────────────────────────────────────────────────────
+app.patch('/api/config', (req, res) => {
+  const { galleryDir, apiKey } = req.body as { galleryDir?: string; apiKey?: string };
+  if (galleryDir !== undefined) {
+    db.prepare(`INSERT OR REPLACE INTO config (key, value) VALUES ('gallery_dir', ?)`).run(galleryDir);
+  }
+  if (apiKey !== undefined) {
+    db.prepare(`INSERT OR REPLACE INTO config (key, value) VALUES ('api_key', ?)`).run(apiKey);
+  }
+  res.json({ ok: true });
+});
+
+// ── GET /api/gallery ──────────────────────────────────────────────────────────
 app.get('/api/gallery', (_req, res) => {
+  const dir = getGalleryDir();
+  if (!dir) return res.json({ files: [] });
   try {
-    const files = fs.readdirSync(GALLERY_DIR)
+    const files = fs.readdirSync(dir)
       .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .map(f => ({ name: f, mtime: fs.statSync(path.join(GALLERY_DIR, f)).mtimeMs }))
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
       .sort((a, b) => b.mtime - a.mtime)
       .map(f => f.name);
     res.json({ files });
@@ -83,7 +118,16 @@ app.get('/api/gallery', (_req, res) => {
   }
 });
 
-app.use('/gallery-images', express.static(GALLERY_DIR, { maxAge: 0 }));
+// ── GET /gallery-images/:filename ─────────────────────────────────────────────
+app.get('/gallery-images/:filename', (req, res) => {
+  const dir = getGalleryDir();
+  if (!dir) return res.status(404).json({ error: 'Gallery not configured' });
+  const filePath = path.resolve(dir, req.params.filename);
+  if (!filePath.startsWith(path.resolve(dir))) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  res.sendFile(filePath);
+});
 
 // ── Wildcards helpers ─────────────────────────────────────────────────────────
 const rowToItem = (r: any) => ({
@@ -189,6 +233,6 @@ app.patch('/api/costs/total', (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Gallery + Wildcards server → http://localhost:${PORT}`);
-  console.log(`Images:   ${GALLERY_DIR}`);
+  console.log(`Gallery:  ${getGalleryDir() || '(not configured – set via Settings)'}`);
   console.log(`Database: ${DB_PATH}`);
 });
