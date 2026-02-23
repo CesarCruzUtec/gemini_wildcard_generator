@@ -16,9 +16,14 @@ import {
   Settings2,
   FileText,
   Save,
-  Plus
+  Plus,
+  HelpCircle,
+  X,
+  Image as ImageIcon,
+  Search,
+  ArrowRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -28,41 +33,192 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const DEFAULT_SYSTEM_INSTRUCTION = `You are a professional booru tag expert for Stable Diffusion and ComfyUI. 
-Your task is to generate high-quality costume/clothing with related pose wildcards.
-Each wildcard must contain pose tags relevant to the clothinhgg tags. 
+Your task is to generate high-quality wildcards with costume/clothing, realted colors and related pose.
+Each wildcard must contain pose tags relevant to the clothinhg tags as well as tag colors for each piece of cloth if needed. 
 Each wildcard must be a single line of comma-separated booru tags.
 Example: "white_shirt, pleated_skirt, black_necktie, loafers, school_uniform"
 Provide exactly 5 distinct variations based on the user's request. 
 Output ONLY the wildcards, one per line. Do not include numbering, labels, or any other text.`;
 
+type Theme = {
+  id: string;
+  name: string;
+  bg: string;
+  text: string;
+  card: string;
+  border: string;
+  accent: string;
+  sidebar: string;
+  input: string;
+  muted: string;
+  scrollbar: string;
+};
+
+const THEMES: Theme[] = [
+  {
+    id: 'light',
+    name: 'Light',
+    bg: '#fafafa',
+    text: '#1a1a1a',
+    card: '#ffffff',
+    border: 'rgba(0,0,0,0.05)',
+    accent: '#000000',
+    sidebar: '#ffffff',
+    input: 'rgba(0,0,0,0.05)',
+    muted: 'rgba(0,0,0,0.4)',
+    scrollbar: 'rgba(0,0,0,0.05)'
+  },
+  {
+    id: 'dark',
+    name: 'Dark',
+    bg: '#0a0a0a',
+    text: '#e5e5e5',
+    card: '#121212',
+    border: 'rgba(255,255,255,0.1)',
+    accent: '#ffffff',
+    sidebar: '#121212',
+    input: 'rgba(255,255,255,0.05)',
+    muted: 'rgba(255,255,255,0.4)',
+    scrollbar: 'rgba(255,255,255,0.1)'
+  },
+  {
+    id: 'pastel-pink',
+    name: 'Pastel Pink',
+    bg: '#fff5f5',
+    text: '#4a2c2c',
+    card: '#ffffff',
+    border: '#ffe3e3',
+    accent: '#ff8787',
+    sidebar: '#fffafa',
+    input: '#fff0f0',
+    muted: '#c0a0a0',
+    scrollbar: '#ffe3e3'
+  },
+  {
+    id: 'pastel-blue',
+    name: 'Pastel Blue',
+    bg: '#f0f7ff',
+    text: '#2c3e50',
+    card: '#ffffff',
+    border: '#d0e1f9',
+    accent: '#4dabf7',
+    sidebar: '#f8fbff',
+    input: '#e7f3ff',
+    muted: '#868e96',
+    scrollbar: '#d0e1f9'
+  },
+  {
+    id: 'pastel-green',
+    name: 'Pastel Green',
+    bg: '#f4fce3',
+    text: '#2b3d10',
+    card: '#ffffff',
+    border: '#e9fac8',
+    accent: '#82c91e',
+    sidebar: '#fafff0',
+    input: '#f1fbd7',
+    muted: '#868e96',
+    scrollbar: '#e9fac8'
+  },
+  {
+    id: 'pastel-lavender',
+    name: 'Pastel Lavender',
+    bg: '#f8f0fc',
+    text: '#3b2c4a',
+    card: '#ffffff',
+    border: '#f3d9fa',
+    accent: '#be4bdb',
+    sidebar: '#fdfaff',
+    input: '#f8f0fc',
+    muted: '#868e96',
+    scrollbar: '#f3d9fa'
+  }
+];
+
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(THEMES[0]);
   const [systemInstruction, setSystemInstruction] = useState(DEFAULT_SYSTEM_INSTRUCTION);
   const [userPrompt, setUserPrompt] = useState('');
-  const [numToGenerate, setNumToGenerate] = useState(12);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [numToGenerate, setNumToGenerate] = useState(5);
   const [totalCost, setTotalCost] = useState(0);
   const [lastCallCost, setLastCallCost] = useState(0);
-  const [generatedWildcards, setGeneratedWildcards] = useState<{ text: string; createdAt: number }[]>([]);
+  const [generatedWildcards, setGeneratedWildcards] = useState<{ id: string; text: string; createdAt: number }[]>([]);
+  const [savedWildcards, setSavedWildcards] = useState<{ id: string; text: string; createdAt: number }[]>([]);
   const [lastGenerationTime, setLastGenerationTime] = useState<number>(0);
-  const [savedWildcards, setSavedWildcards] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
+  const [refiningWildcard, setRefiningWildcard] = useState<string | null>(null);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const generateWildcards = async (prompt: string, isRefining = false) => {
-    const targetPrompt = prompt.trim() || "Generate random, creative, and unique costume/clothing booru tag wildcards. Surprise me with different styles (e.g., fantasy, sci-fi, historical, modern, avant-garde).";
+  const resizeImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+    });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 4 - referenceImages.length);
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        const resized = await resizeImage(base64);
+        setReferenceImages(prev => [...prev, resized]);
+      };
+      reader.readAsDataURL(file);
+    }
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  const generateWildcards = async () => {
     setIsLoading(true);
-    
-    // Reset last call cost for the new session
     setLastCallCost(0);
     const generationTime = Date.now();
     setLastGenerationTime(generationTime);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const keyToUse = customApiKey || process.env.GEMINI_API_KEY;
+      if (!keyToUse) {
+        alert("Please provide a Gemini API Key in settings.");
+        setShowSettings(true);
+        setIsLoading(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey: keyToUse });
       const model = "gemini-3-flash-preview";
       
-      const totalNeeded = numToGenerate; // Always use count now
+      const totalNeeded = numToGenerate;
       const batchSize = 10;
       const batches: number[] = [];
       
@@ -73,18 +229,31 @@ export default function App() {
       let sessionCost = 0;
       
       for (const count of batches) {
-        const batchPrompt = `${targetPrompt} Provide exactly ${count} distinct variations. Output ONLY the wildcards, one per line.`;
+        let batchPrompt = `${userPrompt}. Provide exactly ${count} distinct variations. Output ONLY the wildcards, one per line.`;
+        if (refiningWildcard) {
+          batchPrompt = `Refine this wildcard: "${refiningWildcard}". User request: ${userPrompt}. Provide exactly ${count} distinct variations. Output ONLY the wildcards, one per line.`;
+        }
+
+        const parts: any[] = [{ text: batchPrompt }];
+        
+        referenceImages.forEach(img => {
+          parts.push({
+            inlineData: {
+              data: img.split(',')[1],
+              mimeType: 'image/jpeg'
+            }
+          });
+        });
 
         const response = await ai.models.generateContent({
           model,
-          contents: batchPrompt,
+          contents: { parts },
           config: {
             systemInstruction: systemInstruction,
             temperature: 0.8,
           },
         });
 
-        // Calculate cost (Estimated based on Gemini 1.5 Flash pricing)
         const usage = response.usageMetadata;
         if (usage) {
           const inputCost = (usage.promptTokenCount || 0) * (0.5 / 1000000);
@@ -97,12 +266,16 @@ export default function App() {
         const text = response.text || '';
         const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, count);
         
-        const newItems = lines.map(l => ({ text: l, createdAt: generationTime }));
+        const newItems = lines.map(l => ({ 
+          id: Math.random().toString(36).substr(2, 9),
+          text: l, 
+          createdAt: generationTime 
+        }));
         
-        // Update UI incrementally but prepend
         setGeneratedWildcards(prev => [...newItems, ...prev]);
       }
       setLastCallCost(sessionCost);
+      setRefiningWildcard(null);
     } catch (error) {
       console.error("Generation failed:", error);
       alert("Failed to generate wildcards.");
@@ -111,20 +284,24 @@ export default function App() {
     }
   };
 
-  const handleCopy = (text: string, index: number) => {
+  const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
+    setCopiedIndex(id);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const saveToSavedList = (wildcard: string) => {
-    if (!savedWildcards.includes(wildcard)) {
-      setSavedWildcards(prev => [wildcard, ...prev]);
+  const saveToSavedList = (item: { id: string; text: string; createdAt: number }) => {
+    if (!savedWildcards.find(s => s.text === item.text)) {
+      setSavedWildcards(prev => [item, ...prev]);
     }
   };
 
-  const removeSaved = (index: number) => {
-    setSavedWildcards(prev => prev.filter((_, i) => i !== index));
+  const removeSaved = (id: string) => {
+    setSavedWildcards(prev => prev.filter(s => s.id !== id));
+  };
+
+  const removeGenerated = (id: string) => {
+    setGeneratedWildcards(prev => prev.filter(s => s.id !== id));
   };
 
   const clearSaved = () => {
@@ -135,7 +312,7 @@ export default function App() {
 
   const downloadWildcards = () => {
     if (savedWildcards.length === 0) return;
-    const content = savedWildcards.join('\n');
+    const content = savedWildcards.map(s => s.text).join('\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -155,268 +332,471 @@ export default function App() {
     reader.onload = (e) => {
       const content = e.target?.result as string;
       const lines = content.split('\n').filter(line => line.trim().length > 0);
-      setSavedWildcards(prev => [...new Set([...lines, ...prev])]);
+      const newSaved = lines.map(l => ({
+        id: Math.random().toString(36).substr(2, 9),
+        text: l,
+        createdAt: Date.now()
+      }));
+      setSavedWildcards(prev => [...newSaved, ...prev]);
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleRefine = (wildcard: string) => {
-    setUserPrompt(`${wildcard}\n\nRefine: `);
-    // Scroll to top of sidebar if needed, but usually just setting state is enough
+    setRefiningWildcard(wildcard);
     const textarea = document.querySelector('textarea');
-    if (textarea) {
-      textarea.focus();
-      // Set cursor to end
-      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    }
+    if (textarea) textarea.focus();
   };
 
+  const filteredGenerated = generatedWildcards.filter(w => 
+    w.text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const filteredSaved = savedWildcards.filter(w => 
+    w.text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="h-screen flex flex-col bg-[#fafafa] text-[#1a1a1a] font-sans overflow-hidden">
+    <div 
+      className="h-screen flex flex-col font-sans overflow-hidden transition-colors duration-300"
+      style={{ backgroundColor: theme.bg, color: theme.text }}
+    >
       {/* Header */}
-      <header className="h-14 border-b border-black/5 bg-white flex items-center justify-between px-6 shrink-0">
+      <header 
+        className="h-14 border-b flex items-center justify-between px-6 shrink-0 transition-colors duration-300"
+        style={{ backgroundColor: theme.sidebar, borderColor: theme.border }}
+      >
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-black" />
+          <Sparkles className="w-4 h-4" style={{ color: theme.accent }} />
           <h1 className="text-sm font-medium tracking-tight">Wildcard Studio</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Theme</label>
+            <select 
+              value={theme.id}
+              onChange={(e) => setTheme(THEMES.find(t => t.id === e.target.value) || THEMES[0])}
+              className="bg-transparent text-[10px] font-bold uppercase tracking-wider border-none focus:ring-0 cursor-pointer"
+              style={{ color: theme.accent }}
+            >
+              {THEMES.map(t => (
+                <option key={t.id} value={t.id} style={{ backgroundColor: theme.card, color: theme.text }}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          <button 
+            onClick={() => setShowGuide(true)}
+            className="p-2 rounded-md transition-colors hover:bg-black/5"
+            style={{ color: theme.muted }}
+            title="How to use"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
           <button 
             onClick={() => setShowSettings(!showSettings)}
-            className={cn(
-              "p-2 rounded-md transition-colors",
-              showSettings ? "bg-black/5 text-black" : "text-black/40 hover:text-black hover:bg-black/5"
-            )}
+            className="p-2 rounded-md transition-colors"
+            style={{ 
+              backgroundColor: showSettings ? theme.input : 'transparent',
+              color: showSettings ? theme.accent : theme.muted 
+            }}
           >
             <Settings2 className="w-4 h-4" />
           </button>
         </div>
       </header>
 
+      {/* Tutorial Modal */}
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowGuide(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
+              style={{ backgroundColor: theme.card, color: theme.text }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b flex items-center justify-between" style={{ borderColor: theme.border }}>
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5" style={{ color: theme.accent }} />
+                  <h2 className="text-sm font-bold uppercase tracking-wider">How to use Wildcard Studio</h2>
+                </div>
+                <button onClick={() => setShowGuide(false)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">1. Generate</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    Enter a prompt in the <span className="font-bold">Request</span> box. You can also upload up to <span className="font-bold">4 reference images</span> to guide the generation. Set the <span className="font-bold">Count</span> and hit <span className="font-bold">Generate</span>.
+                  </p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">2. Refine</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    Found a wildcard you like? Click the <Sparkles className="w-3 h-3 inline" /> <span className="font-bold">Refine</span> button. The card will appear in the sidebar as a reference, allowing you to provide specific refinement instructions.
+                  </p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">3. Organize & Search</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    The app is split into <span className="font-bold">Generated</span> and <span className="font-bold">Saved</span> grids. Use the <span className="font-bold">Search Bar</span> at the top to filter both sections simultaneously. You can also <span className="font-bold">drag and drop</span> cards to reorder them.
+                  </p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">4. Save & Export</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    Click the <Save className="w-3 h-3 inline" /> <span className="font-bold">Save</span> button to move a wildcard to your permanent list. Use the <Upload className="w-3 h-3 inline" /> <span className="font-bold">Import</span> or <Download className="w-3 h-3 inline" /> <span className="font-bold">Export</span> buttons to manage your <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-xs">.txt</code> files.
+                  </p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">5. Cost & Themes</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    Monitor API usage at the bottom of the sidebar. Switch between various <span className="font-bold">Themes</span> in the header to find your preferred aesthetic.
+                  </p>
+                </section>
+              </div>
+
+              <div className="p-6 border-t flex justify-end" style={{ borderColor: theme.border }}>
+                <button 
+                  onClick={() => setShowGuide(false)}
+                  className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
+                  style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
+                >
+                  Got it
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings Overlay */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-14 left-0 right-0 z-50 border-b p-6 shadow-xl"
+            style={{ backgroundColor: theme.card, borderColor: theme.border }}
+          >
+            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">System Instructions</label>
+                  <button 
+                    onClick={() => setSystemInstruction(DEFAULT_SYSTEM_INSTRUCTION)}
+                    className="text-[10px] font-bold opacity-40 hover:opacity-100 transition-colors"
+                  >
+                    Reset to Default
+                  </button>
+                </div>
+                <textarea 
+                  value={systemInstruction}
+                  onChange={(e) => setSystemInstruction(e.target.value)}
+                  className="w-full h-48 border-none rounded-xl p-4 text-xs font-mono focus:ring-1 transition-all resize-none"
+                  style={{ 
+                    backgroundColor: theme.input, 
+                    color: theme.text,
+                    '--tw-ring-color': theme.accent
+                  } as any}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Gemini API Key</label>
+                  <div className="relative">
+                    <input 
+                      type="password"
+                      value={customApiKey}
+                      onChange={(e) => setCustomApiKey(e.target.value)}
+                      placeholder={process.env.GEMINI_API_KEY ? "Using environment key (••••••••)" : "Enter your API key..."}
+                      className="w-full h-10 border-none rounded-lg px-4 text-xs focus:ring-1 transition-all pr-10"
+                      style={{ 
+                        backgroundColor: theme.input, 
+                        color: theme.text,
+                        '--tw-ring-color': theme.accent
+                      } as any}
+                    />
+                    {customApiKey && (
+                      <button 
+                        onClick={() => setCustomApiKey('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[9px] opacity-30 leading-relaxed">
+                    Your API key is stored only in your browser's memory for this session. 
+                    If left empty, the app will attempt to use the system default key.
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
+                  <button 
+                    onClick={() => setShowSettings(false)}
+                    className="w-full h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
+                    style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
+                  >
+                    Close Settings
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Input & Saved */}
-        <aside className="w-80 border-r border-black/5 flex flex-col shrink-0 bg-white">
+        <aside 
+          className="w-80 border-r flex flex-col shrink-0 transition-colors duration-300"
+          style={{ backgroundColor: theme.sidebar, borderColor: theme.border }}
+        >
           {/* Input Section */}
-          <div className="p-6 space-y-4 border-b border-black/5">
+          <div className="p-6 space-y-4 border-b overflow-y-auto custom-scrollbar" style={{ borderColor: theme.border }}>
+            {refiningWildcard && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Refining Card</label>
+                  <button 
+                    onClick={() => setRefiningWildcard(null)}
+                    className="text-[10px] font-bold text-red-500 opacity-60 hover:opacity-100 transition-opacity"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div 
+                  className="p-3 rounded-xl border text-[11px] font-mono leading-relaxed shadow-sm relative group"
+                  style={{ backgroundColor: theme.card, borderColor: theme.accent }}
+                >
+                  <div className="opacity-60 line-clamp-3">
+                    {refiningWildcard}
+                  </div>
+                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                    <Sparkles className="w-4 h-4 opacity-40" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-black/40">Request</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Request</label>
               <textarea 
                 value={userPrompt}
                 onChange={(e) => setUserPrompt(e.target.value)}
                 placeholder="e.g., cyberpunk street wear..."
-                className="w-full h-24 bg-black/5 border-none rounded-lg p-3 text-sm focus:ring-1 focus:ring-black/10 transition-all resize-none placeholder:text-black/20"
+                className="w-full h-24 border-none rounded-lg p-3 text-sm focus:ring-1 transition-all resize-none placeholder:opacity-20"
+                style={{ 
+                  backgroundColor: theme.input, 
+                  color: theme.text,
+                  '--tw-ring-color': theme.accent 
+                } as any}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Reference Images ({referenceImages.length}/4)</label>
+                <button 
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={referenceImages.length >= 4}
+                  className="p-1 hover:bg-black/5 rounded-md transition-colors disabled:opacity-10"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+                <input 
+                  type="file" 
+                  ref={imageInputRef} 
+                  onChange={handleImageUpload} 
+                  className="hidden" 
+                  accept="image/*" 
+                  multiple 
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {referenceImages.map((img, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-md overflow-hidden bg-black/5">
+                    <img src={img} className="w-full h-full object-cover" />
+                    <button 
+                      onClick={() => setReferenceImages(prev => prev.filter((_, i) => i !== idx))}
+                      className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl-md"
+                    >
+                      <X className="w-2 h-2" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
             
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-black/40">Count</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Count</label>
               <input 
                 type="number"
                 min="1"
                 max="100"
                 value={numToGenerate}
                 onChange={(e) => setNumToGenerate(parseInt(e.target.value) || 1)}
-                className="w-full h-9 bg-black/5 border-none rounded-lg px-3 text-xs focus:ring-1 focus:ring-black/10 transition-all"
+                className="w-full h-9 border-none rounded-lg px-3 text-xs focus:ring-1 transition-all"
+                style={{ 
+                  backgroundColor: theme.input, 
+                  color: theme.text,
+                  '--tw-ring-color': theme.accent
+                } as any}
               />
             </div>
 
             <div className="flex gap-2">
               <button 
-                onClick={() => generateWildcards(userPrompt)}
-                disabled={isLoading || !userPrompt.trim()}
-                className="flex-1 h-10 bg-black text-white text-xs font-medium rounded-lg hover:bg-black/80 disabled:bg-black/10 disabled:text-black/20 transition-all flex items-center justify-center gap-2"
+                onClick={() => generateWildcards()}
+                disabled={isLoading || (!userPrompt.trim() && referenceImages.length === 0)}
+                className="flex-1 h-10 text-xs font-medium rounded-lg disabled:opacity-20 transition-all flex items-center justify-center gap-2"
+                style={{ 
+                  backgroundColor: theme.accent, 
+                  color: theme.id === 'dark' ? '#000' : '#fff' 
+                }}
               >
                 {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Generate"}
               </button>
               <button 
-                onClick={() => { setUserPrompt(''); generateWildcards(''); }}
+                onClick={() => { setUserPrompt(''); setReferenceImages([]); setRefiningWildcard(null); generateWildcards(); }}
                 disabled={isLoading}
-                className="w-10 h-10 bg-black/5 text-black/40 hover:text-black hover:bg-black/10 rounded-lg transition-all flex items-center justify-center"
+                className="w-10 h-10 rounded-lg transition-all flex items-center justify-center"
                 title="Surprise Me"
+                style={{ backgroundColor: theme.input, color: theme.muted }}
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
               </button>
             </div>
           </div>
 
-          {/* Saved Section */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-4 flex items-center justify-between shrink-0">
-              <h2 className="text-[10px] font-bold uppercase tracking-wider text-black/40 flex items-center gap-2">
-                <FileText className="w-3 h-3" />
-                Saved ({savedWildcards.length})
-              </h2>
-              <div className="flex gap-1">
-                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 text-black/40 hover:text-black hover:bg-black/5 rounded-md transition-colors" title="Import">
-                  <Upload className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={downloadWildcards} disabled={savedWildcards.length === 0} className="p-1.5 text-black/40 hover:text-black hover:bg-black/5 rounded-md transition-colors disabled:opacity-10" title="Export">
-                  <Download className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={clearSaved} disabled={savedWildcards.length === 0} className="p-1.5 text-black/40 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-10" title="Clear All">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt" />
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
-              <AnimatePresence initial={false}>
-                {savedWildcards.map((wildcard, idx) => (
-                  <motion.div 
-                    key={`${wildcard}-${idx}`}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    className="group relative p-3 bg-black/5 hover:bg-black/10 rounded-lg transition-all"
-                  >
-                    <p className="text-[11px] font-mono text-black/70 leading-relaxed pr-6">
-                      {wildcard}
-                    </p>
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
-                      <button onClick={() => handleCopy(wildcard, idx + 1000)} className="p-1 text-black/30 hover:text-black">
-                        {copiedIndex === idx + 1000 ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                      <button onClick={() => removeSaved(idx)} className="p-1 text-black/30 hover:text-red-500">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              {savedWildcards.length === 0 && (
-                <div className="py-12 text-center border border-dashed border-black/5 rounded-xl">
-                  <p className="text-[10px] text-black/20 font-medium">Empty</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <div className="flex-1" />
 
           {/* Cost Summary Section */}
-          <div className="px-4 py-3 border-t border-black/5 bg-black/[0.02] shrink-0">
+          <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: theme.border, backgroundColor: theme.input }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-black/30">Session Cost</span>
-              <span className="text-[10px] font-mono font-medium text-black/60">${lastCallCost.toFixed(6)}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-30">Session Cost</span>
+              <span className="text-[10px] font-mono font-medium opacity-60">${lastCallCost.toFixed(6)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-black/30">Total Cost</span>
-              <span className="text-[10px] font-mono font-medium text-black/60">${totalCost.toFixed(6)}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-30">Total Cost</span>
+              <span className="text-[10px] font-mono font-medium opacity-60">${totalCost.toFixed(6)}</span>
             </div>
           </div>
         </aside>
 
         {/* Main Content: Generated Results */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden">
-          {/* Settings Overlay */}
-          <AnimatePresence>
-            {showSettings && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-14 left-80 right-0 z-40 bg-white border-b border-black/5 p-6 shadow-sm"
-              >
-                <div className="max-w-2xl mx-auto space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-black/40">System Instructions</label>
-                    <button onClick={() => setSystemInstruction(DEFAULT_SYSTEM_INSTRUCTION)} className="text-[10px] font-bold text-black/40 hover:text-black transition-colors">Reset</button>
-                  </div>
-                  <textarea 
-                    value={systemInstruction}
-                    onChange={(e) => setSystemInstruction(e.target.value)}
-                    className="w-full h-32 bg-black/5 border-none rounded-lg p-4 text-xs font-mono focus:ring-1 focus:ring-black/10 transition-all resize-none"
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="flex-1 flex flex-col overflow-hidden transition-colors duration-300" style={{ backgroundColor: theme.bg }}>
+          {/* Search Bar */}
+          <div className="h-14 border-b flex items-center px-6 gap-4 shrink-0" style={{ borderColor: theme.border }}>
+            <Search className="w-4 h-4 opacity-20" />
+            <input 
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search wildcards..."
+              className="flex-1 bg-transparent border-none text-sm focus:ring-0 placeholder:opacity-20"
+            />
+          </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="max-w-6xl mx-auto p-10 space-y-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[10px] font-bold uppercase tracking-wider text-black/40">Generated Wildcards ({generatedWildcards.length})</h2>
-                <div className="flex items-center gap-4">
-                  {generatedWildcards.length > 0 && (
-                    <button 
-                      onClick={() => setGeneratedWildcards([])} 
-                      className="text-[10px] font-bold text-black/40 hover:text-red-500 flex items-center gap-1 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Clear History
-                    </button>
-                  )}
-                  {generatedWildcards.length > 0 && (
-                    <button onClick={() => generateWildcards(userPrompt)} className="text-[10px] font-bold text-black/40 hover:text-black flex items-center gap-1 transition-colors">
-                      <RefreshCw className="w-3 h-3" />
-                      Refresh
-                    </button>
-                  )}
-                </div>
+          {/* Split Content */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Generated Section */}
+            <div className="flex-1 flex flex-col border-r overflow-hidden" style={{ borderColor: theme.border }}>
+              <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
+                <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Generated ({filteredGenerated.length})</h2>
+                <button 
+                  onClick={() => setGeneratedWildcards([])}
+                  className="p-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <AnimatePresence mode="popLayout">
-                  {isLoading && generatedWildcards.length === 0 ? (
-                    <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="col-span-full space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[1, 2, 3, 4, 5, 6].map(i => (
-                          <div key={i} className="h-32 bg-black/5 rounded-xl animate-pulse" />
-                        ))}
-                      </div>
-                    </motion.div>
-                  ) : generatedWildcards.length > 0 ? (
-                    generatedWildcards.map((item, idx) => (
-                      <motion.div 
-                        key={`${item.text}-${idx}`}
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <Reorder.Group 
+                  axis="y" 
+                  values={filteredGenerated} 
+                  onReorder={setGeneratedWildcards}
+                  className="grid grid-cols-1 xl:grid-cols-2 gap-4"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {filteredGenerated.map((item) => (
+                      <Reorder.Item 
+                        key={item.id}
+                        value={item}
                         layout
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
                         className={cn(
-                          "group relative h-32 bg-white border rounded-xl transition-all cursor-pointer overflow-hidden",
-                          item.createdAt === lastGenerationTime 
-                            ? "border-black/20 shadow-sm ring-1 ring-black/5" 
-                            : "border-black/5 hover:border-black/20"
+                          "group relative h-32 border rounded-xl transition-all cursor-pointer overflow-hidden",
+                          item.createdAt === lastGenerationTime ? "ring-1" : ""
                         )}
-                        onClick={() => handleCopy(item.text, idx)}
+                        style={{ 
+                          backgroundColor: theme.card, 
+                          borderColor: item.createdAt === lastGenerationTime ? theme.accent : theme.border,
+                          '--tw-ring-color': theme.accent
+                        } as any}
+                        onClick={() => handleCopy(item.text, item.id)}
                       >
-                        {/* Content */}
                         <div className="p-4 h-full flex flex-col">
-                          <p className="text-[11px] font-mono text-black/50 leading-relaxed line-clamp-4 group-hover:opacity-0 transition-opacity">
+                          <p className="text-[11px] font-mono opacity-50 leading-relaxed line-clamp-4 group-hover:opacity-0 transition-opacity">
                             {item.text}
                           </p>
-                          <div className="absolute inset-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 backdrop-blur-[2px] overflow-y-auto custom-scrollbar">
-                            <p className="text-[11px] font-mono text-black leading-relaxed">
+                          <div className="absolute inset-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] overflow-y-auto custom-scrollbar" style={{ backgroundColor: `${theme.card}80` }}>
+                            <p className="text-[11px] font-mono leading-relaxed">
                               {item.text}
                             </p>
                           </div>
                         </div>
-                        
-                        {/* Actions */}
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button 
-                            onClick={(e) => { e.stopPropagation(); saveToSavedList(item.text); }}
-                            className="p-1.5 bg-white border border-black/10 rounded-md hover:bg-black hover:text-white transition-all shadow-sm"
-                            title="Save"
+                            onClick={(e) => { e.stopPropagation(); saveToSavedList(item); }}
+                            className="p-1.5 border rounded-md transition-all shadow-sm"
+                            style={{ backgroundColor: theme.card, borderColor: theme.border }}
                           >
                             <Save className="w-3 h-3" />
                           </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
-                            className="p-1.5 bg-white border border-black/10 rounded-md hover:bg-black hover:text-white transition-all shadow-sm"
-                            title="Refine"
+                            className="p-1.5 border rounded-md transition-all shadow-sm"
+                            style={{ backgroundColor: theme.card, borderColor: theme.border }}
                           >
                             <Sparkles className="w-3 h-3" />
                           </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); removeGenerated(item.id); }}
+                            className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
+                            style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
-                        
-                        {/* Copy Indicator */}
                         <AnimatePresence>
-                          {copiedIndex === idx && (
+                          {copiedIndex === item.id && (
                             <motion.div 
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               exit={{ opacity: 0 }}
-                              className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-20"
+                              className="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-20"
+                              style={{ backgroundColor: `${theme.card}e6` }}
                             >
                               <div className="flex items-center gap-2 text-emerald-600">
                                 <Check className="w-4 h-4" />
@@ -425,27 +805,96 @@ export default function App() {
                             </motion.div>
                           )}
                         </AnimatePresence>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full py-32 flex flex-col items-center justify-center text-center space-y-4">
-                      <div className="w-12 h-12 bg-black/5 rounded-full flex items-center justify-center">
-                        <Plus className="w-5 h-5 text-black/20" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-black/30 font-medium">No wildcards generated</p>
-                        <p className="text-[10px] text-black/20">Enter a request to begin</p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                {/* Loading indicator for subsequent batches */}
-                {isLoading && generatedWildcards.length > 0 && (
-                  <div className="col-span-full flex justify-center py-4">
-                    <RefreshCw className="w-4 h-4 animate-spin text-black/20" />
-                  </div>
-                )}
+                      </Reorder.Item>
+                    ))}
+                  </AnimatePresence>
+                </Reorder.Group>
+              </div>
+            </div>
+
+            {/* Saved Section */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
+                <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Saved ({filteredSaved.length})</h2>
+                <div className="flex gap-2">
+                  <button onClick={() => fileInputRef.current?.click()} className="p-1 opacity-40 hover:opacity-100" title="Import">
+                    <Upload className="w-3 h-3" />
+                  </button>
+                  <button onClick={downloadWildcards} className="p-1 opacity-40 hover:opacity-100" title="Export">
+                    <Download className="w-3 h-3" />
+                  </button>
+                  <button onClick={clearSaved} className="p-1 opacity-40 hover:opacity-100 hover:text-red-500" title="Clear All">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt" />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <Reorder.Group 
+                  axis="y" 
+                  values={filteredSaved} 
+                  onReorder={setSavedWildcards}
+                  className="grid grid-cols-1 xl:grid-cols-2 gap-4"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {filteredSaved.map((item) => (
+                      <Reorder.Item 
+                        key={item.id}
+                        value={item}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="group relative h-32 border rounded-xl transition-all cursor-pointer overflow-hidden"
+                        style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                        onClick={() => handleCopy(item.text, item.id)}
+                      >
+                        <div className="p-4 h-full flex flex-col">
+                          <p className="text-[11px] font-mono opacity-50 leading-relaxed line-clamp-4 group-hover:opacity-0 transition-opacity">
+                            {item.text}
+                          </p>
+                          <div className="absolute inset-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] overflow-y-auto custom-scrollbar" style={{ backgroundColor: `${theme.card}80` }}>
+                            <p className="text-[11px] font-mono leading-relaxed">
+                              {item.text}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
+                            className="p-1.5 border rounded-md transition-all shadow-sm"
+                            style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                          >
+                            <Sparkles className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); removeSaved(item.id); }}
+                            className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
+                            style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <AnimatePresence>
+                          {copiedIndex === item.id && (
+                            <motion.div 
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-20"
+                              style={{ backgroundColor: `${theme.card}e6` }}
+                            >
+                              <div className="flex items-center gap-2 text-emerald-600">
+                                <Check className="w-4 h-4" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Copied</span>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </Reorder.Item>
+                    ))}
+                  </AnimatePresence>
+                </Reorder.Group>
               </div>
             </div>
           </div>
@@ -460,11 +909,11 @@ export default function App() {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.05);
+          background: ${theme.scrollbar};
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 0, 0, 0.1);
+          background: ${theme.accent}40;
         }
       `}</style>
     </div>
