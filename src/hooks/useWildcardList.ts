@@ -101,11 +101,13 @@ export function useWildcardList(
    * We don't shift nextCursorRef because new DB rows get positions below all
    * existing ones — cursor-based `position > X` will correctly skip them on
    * future loadMore calls.
+   * Both dbFetched and serverTotal are incremented so `hasMore` stays stable
+   * and the virtualizer does not immediately trigger an unwanted loadMore.
    */
   const prepend = useCallback((newItems: WildcardItem[]) => {
     setItems((prev) => [...newItems, ...prev]);
     setServerTotal((prev) => prev + newItems.length);
-    // dbFetched intentionally unchanged (new items are above the cursor window).
+    setDbFetched((prev) => prev + newItems.length);
   }, []);
 
   const update = useCallback((id: string, patch: Partial<WildcardItem>) => {

@@ -98,7 +98,7 @@ export function WildcardList({
   }, [virtualItems, hasMore, isLoadingMore, safeItems.length, onLoadMore]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Section header */}
       <div className="border-b shrink-0" style={{ borderColor: theme.border }}>
         <div className="p-4 flex items-center justify-between gap-2">
@@ -167,7 +167,7 @@ export function WildcardList({
           </svg>
         </div>
       ) : (
-        <div ref={parentRef} className="flex-1 overflow-y-auto custom-scrollbar">
+        <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
           <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
             {virtualItems.map((vRow) => {
               const isLoaderRow = vRow.index >= safeItems.length;

@@ -414,7 +414,7 @@ export default function App() {
 
           {/* Generated + Saved columns */}
           <div className="flex-1 flex overflow-hidden">
-            <div className="flex-1 border-r overflow-hidden" style={{ borderColor: theme.border }}>
+            <div className="flex-1 border-r overflow-hidden flex flex-col" style={{ borderColor: theme.border }}>
               <WildcardList
                 theme={theme}
                 title="Generated"
@@ -443,7 +443,7 @@ export default function App() {
               />
             </div>
 
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col">
               <WildcardList
                 theme={theme}
                 title="Saved"

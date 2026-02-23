@@ -9,7 +9,7 @@
  *   GET  /api/gallery              → JSON list of image filenames, newest first
  *   GET  /gallery-images/:f        → serves the image file
  *
- * Wildcards (SQLite, cursor-based pagination):
+ * Wildcards (SQLite, cursor-based pagination on rowid DESC — newest first):
  *   GET    /api/wildcards?list=&limit=50&cursor=&q=  → { items[], total, nextCursor }
  *   POST   /api/wildcards                            → batch create { items[] }
  *   PATCH  /api/wildcards/:id                        → update { list?, previewUrl? }
@@ -42,10 +42,8 @@ db.exec(`
     text        TEXT NOT NULL,
     list        TEXT NOT NULL CHECK(list IN ('generated', 'saved')),
     preview_url TEXT,
-    position    REAL NOT NULL DEFAULT 0,
     created_at  INTEGER NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS idx_wildcards_list_pos  ON wildcards(list, position ASC);
   CREATE INDEX IF NOT EXISTS idx_wildcards_list_text ON wildcards(list, text);
   CREATE TABLE IF NOT EXISTS costs (
     id         TEXT PRIMARY KEY,
@@ -71,6 +69,13 @@ db.exec(`
 `);
 db.prepare(`INSERT OR IGNORE INTO config (key, value) VALUES ('gallery_dir', '')`).run();
 db.prepare(`INSERT OR IGNORE INTO config (key, value) VALUES ('api_key', '')`).run();
+
+// ── Migrations ────────────────────────────────────────────────────────────────
+// Drop the old position column and its index if they still exist from a prior schema.
+try {
+  db.exec('DROP INDEX IF EXISTS idx_wildcards_list_pos');
+  db.exec('ALTER TABLE wildcards DROP COLUMN position');
+} catch { /* already migrated or column never existed */ }
 
 function getConfigValue(key: string): string {
   const row = db.prepare(`SELECT value FROM config WHERE key = ?`).get(key) as any;
@@ -148,12 +153,11 @@ const rowToItem = (r: any) => ({
   list: r.list as 'generated' | 'saved',
   previewUrl: r.preview_url ?? undefined,
   createdAt: r.created_at as number,
-  position: r.position as number,
 });
 
 // ── GET /api/wildcards?list=&limit=&cursor=&q= ───────────────────────────────
-// Cursor-based pagination on `position`. New items are prepended at positions
-// below the cursor, so `position > cursor` never includes them on the next page.
+// Cursor-based pagination on `rowid DESC` (newest inserted = first shown).
+// `cursor` is the rowid of the last fetched row; next page uses `rowid < cursor`.
 const MAX_LIMIT = 200;
 app.get('/api/wildcards', (req, res) => {
   const list = req.query.list as string;
@@ -164,13 +168,13 @@ app.get('/api/wildcards', (req, res) => {
   const q = req.query.q ? `%${req.query.q}%` : '%';
 
   const rows = cursor !== null
-    ? db.prepare('SELECT * FROM wildcards WHERE list = ? AND text LIKE ? AND position > ? ORDER BY position ASC LIMIT ?').all(list, q, cursor, limit)
-    : db.prepare('SELECT * FROM wildcards WHERE list = ? AND text LIKE ? ORDER BY position ASC LIMIT ?').all(list, q, limit);
+    ? db.prepare('SELECT rowid, * FROM wildcards WHERE list = ? AND text LIKE ? AND rowid < ? ORDER BY rowid DESC LIMIT ?').all(list, q, cursor, limit)
+    : db.prepare('SELECT rowid, * FROM wildcards WHERE list = ? AND text LIKE ? ORDER BY rowid DESC LIMIT ?').all(list, q, limit);
 
   const totalRow = db.prepare('SELECT COUNT(*) as total FROM wildcards WHERE list = ? AND text LIKE ?').get(list, q) as any;
   const total: number = totalRow?.total ?? 0;
   const items = (rows as any[]).map(rowToItem);
-  const nextCursor: number | null = items.length > 0 ? items[items.length - 1].position : null;
+  const nextCursor: number | null = rows.length > 0 ? (rows[rows.length - 1] as any).rowid : null;
 
   res.json({ items, total, nextCursor });
 });
@@ -180,17 +184,12 @@ app.post('/api/wildcards', (req, res) => {
   const { items } = req.body as { items: any[] };
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'No items' });
 
-  const list = items[0].list as string;
-  const minRow = db.prepare('SELECT MIN(position) as min FROM wildcards WHERE list = ?').get(list) as any;
-  const minPos: number = minRow?.min ?? 0;
-  const startPos = minPos - items.length;
-
   const stmt = db.prepare(
-    'INSERT OR REPLACE INTO wildcards (id, text, list, preview_url, position, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT OR REPLACE INTO wildcards (id, text, list, preview_url, created_at) VALUES (?, ?, ?, ?, ?)'
   );
   db.transaction(() => {
-    items.forEach((item, i) => {
-      stmt.run(item.id, item.text, item.list, item.previewUrl ?? null, startPos + i, item.createdAt);
+    items.forEach((item) => {
+      stmt.run(item.id, item.text, item.list, item.previewUrl ?? null, item.createdAt);
     });
   })();
   res.json({ ok: true });
