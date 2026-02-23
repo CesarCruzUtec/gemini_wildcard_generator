@@ -352,6 +352,18 @@ export default function App() {
     if (textarea) textarea.focus();
   };
 
+  // Merges a reordered filtered subset back into the full list
+  const mergeReorder = <T extends { id: string }>(fullList: T[], filteredReordered: T[]): T[] => {
+    const filteredIds = new Set(filteredReordered.map(item => item.id));
+    const filteredIndexes = fullList.reduce<number[]>((acc, item, idx) => {
+      if (filteredIds.has(item.id)) acc.push(idx);
+      return acc;
+    }, []);
+    const result = [...fullList];
+    filteredIndexes.forEach((pos, i) => { result[pos] = filteredReordered[i]; });
+    return result;
+  };
+
   const filteredGenerated = generatedWildcards.filter(w =>
     w.text.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -570,7 +582,7 @@ export default function App() {
       <main className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Input & Saved */}
         <aside
-          className="w-80 border-r flex flex-col shrink-0 transition-colors duration-300"
+          className="w-[26rem] border-r flex flex-col shrink-0 transition-colors duration-300"
           style={{ backgroundColor: theme.sidebar, borderColor: theme.border }}
         >
           {/* Input Section */}
@@ -587,14 +599,11 @@ export default function App() {
                   </button>
                 </div>
                 <div
-                  className="p-3 rounded-xl border text-[11px] font-mono leading-relaxed shadow-sm relative group"
+                  className="p-3 rounded-xl border text-[11px] font-mono leading-relaxed shadow-sm"
                   style={{ backgroundColor: theme.card, borderColor: theme.accent }}
                 >
-                  <div className="opacity-60 line-clamp-3">
+                  <div className="opacity-70 whitespace-pre-wrap break-words">
                     {refiningWildcard}
-                  </div>
-                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                    <Sparkles className="w-4 h-4 opacity-40" />
                   </div>
                 </div>
               </div>
@@ -736,20 +745,20 @@ export default function App() {
                 <Reorder.Group
                   axis="y"
                   values={filteredGenerated}
-                  onReorder={setGeneratedWildcards}
-                  className="grid grid-cols-1 xl:grid-cols-2 gap-4"
+                  onReorder={(reordered) => setGeneratedWildcards(prev => mergeReorder(prev, reordered))}
+                  className="flex flex-col gap-4"
                 >
                   <AnimatePresence mode="popLayout">
                     {filteredGenerated.map((item) => (
                       <Reorder.Item
                         key={item.id}
                         value={item}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        dragListener={true}
                         className={cn(
-                          "group relative h-32 border rounded-xl transition-all cursor-pointer overflow-hidden",
+                          "group relative border rounded-xl transition-colors cursor-grab active:cursor-grabbing overflow-hidden select-none",
                           item.createdAt === lastGenerationTime ? "ring-1" : ""
                         )}
                         style={{
@@ -759,15 +768,10 @@ export default function App() {
                         } as any}
                         onClick={() => handleCopy(item.text, item.id)}
                       >
-                        <div className="p-4 h-full flex flex-col">
-                          <p className="text-[11px] font-mono opacity-50 leading-relaxed line-clamp-4 group-hover:opacity-0 transition-opacity">
+                        <div className="p-4">
+                          <p className="text-[11px] font-mono opacity-60 leading-relaxed whitespace-pre-wrap break-words">
                             {item.text}
                           </p>
-                          <div className="absolute inset-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] overflow-y-auto custom-scrollbar" style={{ backgroundColor: `${theme.card}80` }}>
-                            <p className="text-[11px] font-mono leading-relaxed">
-                              {item.text}
-                            </p>
-                          </div>
                         </div>
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button
@@ -836,31 +840,26 @@ export default function App() {
                 <Reorder.Group
                   axis="y"
                   values={filteredSaved}
-                  onReorder={setSavedWildcards}
-                  className="grid grid-cols-1 xl:grid-cols-2 gap-4"
+                  onReorder={(reordered) => setSavedWildcards(prev => mergeReorder(prev, reordered))}
+                  className="flex flex-col gap-4"
                 >
                   <AnimatePresence mode="popLayout">
                     {filteredSaved.map((item) => (
                       <Reorder.Item
                         key={item.id}
                         value={item}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        className="group relative h-32 border rounded-xl transition-all cursor-pointer overflow-hidden"
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        dragListener={true}
+                        className="group relative border rounded-xl transition-colors cursor-grab active:cursor-grabbing overflow-hidden select-none"
                         style={{ backgroundColor: theme.card, borderColor: theme.border }}
                         onClick={() => handleCopy(item.text, item.id)}
                       >
-                        <div className="p-4 h-full flex flex-col">
-                          <p className="text-[11px] font-mono opacity-50 leading-relaxed line-clamp-4 group-hover:opacity-0 transition-opacity">
+                        <div className="p-4">
+                          <p className="text-[11px] font-mono opacity-60 leading-relaxed whitespace-pre-wrap break-words">
                             {item.text}
                           </p>
-                          <div className="absolute inset-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] overflow-y-auto custom-scrollbar" style={{ backgroundColor: `${theme.card}80` }}>
-                            <p className="text-[11px] font-mono leading-relaxed">
-                              {item.text}
-                            </p>
-                          </div>
                         </div>
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button
