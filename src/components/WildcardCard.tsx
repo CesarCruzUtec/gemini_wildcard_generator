@@ -30,7 +30,7 @@ interface Props {
   previewSide?: 'left' | 'right';
 }
 
-export function WildcardCard({
+export const WildcardCard = React.memo(function WildcardCard({
   theme,
   item,
   isHighlighted = false,
@@ -160,4 +160,4 @@ export function WildcardCard({
       </AnimatePresence>
     </div>
   );
-}
+});

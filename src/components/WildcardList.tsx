@@ -43,7 +43,7 @@ interface Props {
   previewSide?: 'left' | 'right';
 }
 
-export function WildcardList({
+export const WildcardList = React.memo(function WildcardList({
   theme,
   title,
   items,
@@ -225,4 +225,4 @@ export function WildcardList({
       )}
     </div>
   );
-}
+});

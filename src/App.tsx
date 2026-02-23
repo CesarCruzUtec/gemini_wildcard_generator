@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { Theme, WildcardItem } from './types';
 import { THEMES, DEFAULT_SYSTEM_INSTRUCTION } from './constants';
@@ -17,9 +17,8 @@ import { SettingsOverlay } from './components/SettingsOverlay';
 import { ResetDbModal } from './components/modals/ResetDbModal';
 import { GuideModal } from './components/modals/GuideModal';
 import { Sidebar } from './components/Sidebar';
-import { WildcardList } from './components/WildcardList';
 import { RefineBar } from './components/RefineBar';
-import { ColumnPreviewOverlay } from './components/ColumnPreviewOverlay';
+import { WildcardsColumns } from './components/WildcardsColumns';
 
 export default function App() {
   // ── Persisted in localStorage ────────────────────────────────────────────
@@ -52,7 +51,6 @@ export default function App() {
   const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryLoading, setGalleryLoading] = useState(true);
-  const [previewHover, setPreviewHover] = useState<{ url: string; side: 'left' | 'right' } | null>(null);
   const [clearGeneratedConfirm, setClearGeneratedConfirm] = useState(false);
   const [clearSavedConfirm, setClearSavedConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -60,6 +58,9 @@ export default function App() {
   const sessionIdRef = useRef<string | null>(null);
   const sessionCostRef = useRef(0);
   const initializedRef = useRef(false);
+  // Ref to latest saved items so saveToSavedList callback stays stable.
+  const savedItemsRef = useRef(savedList.items);
+  useEffect(() => { savedItemsRef.current = savedList.items; }, [savedList.items]);
 
   // ── Load data on mount ───────────────────────────────────────────────────
   useEffect(() => {
@@ -205,56 +206,52 @@ export default function App() {
   };
 
   // ── Wildcard actions ─────────────────────────────────────────────────────
-  const handleCopy = (text: string, id: string) => {
+  const handleCopy = useCallback((text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
+  }, []);
 
-  const saveToSavedList = (item: WildcardItem) => {
-    if (savedList.items.find((s) => s.text === item.text)) return;
+  const saveToSavedList = useCallback((item: WildcardItem) => {
+    if (savedItemsRef.current.find((s) => s.text === item.text)) return;
     const newItem: WildcardItem = { ...item, id: crypto.randomUUID() };
     savedList.prepend([newItem]);
     dbApi.add([{ ...newItem, list: 'saved' }]);
-  };
+  }, [savedList.prepend]);
 
-  const setPreviewForWildcard = (id: string, imageUrl: string, listType: 'generated' | 'saved') => {
+  const setPreviewForWildcard = useCallback((id: string, imageUrl: string, listType: 'generated' | 'saved') => {
     if (listType === 'generated') generatedList.update(id, { previewUrl: imageUrl });
     else savedList.update(id, { previewUrl: imageUrl });
     dbApi.patch(id, { previewUrl: imageUrl });
-  };
+  }, [generatedList.update, savedList.update]);
 
-  const removePreviewForWildcard = (id: string, listType: 'generated' | 'saved') => {
+  const removePreviewForWildcard = useCallback((id: string, listType: 'generated' | 'saved') => {
     if (listType === 'generated') generatedList.update(id, { previewUrl: undefined });
     else savedList.update(id, { previewUrl: undefined });
     dbApi.patch(id, { previewUrl: null });
-  };
+  }, [generatedList.update, savedList.update]);
 
-  const removeSaved = (id: string) => {
+  const removeSaved = useCallback((id: string) => {
     savedList.remove(id);
     dbApi.remove(id);
-  };
+  }, [savedList.remove]);
 
-  const removeGenerated = (id: string) => {
+  const removeGenerated = useCallback((id: string) => {
     generatedList.remove(id);
     dbApi.remove(id);
-  };
+  }, [generatedList.remove]);
 
-  const clearSaved = () => {
+  const clearSaved = useCallback(() => {
     savedList.clear();
     dbApi.clearList('saved');
     setClearSavedConfirm(false);
-  };
+  }, [savedList.clear]);
 
-  const clearGenerated = () => {
+  const clearGenerated = useCallback(() => {
     generatedList.clear();
     dbApi.clearList('generated');
     setClearGeneratedConfirm(false);
-  };
-
-  const handleHoverChange = (url: string | null, side: 'left' | 'right' = 'right') => {
-    setPreviewHover(url ? { url, side } : null);
-  };
+  }, [generatedList.clear]);
 
   // ── Settings handlers ────────────────────────────────────────────────────
   const handleApplyApiKey = async (trimmed: string) => {
@@ -419,69 +416,29 @@ export default function App() {
           </div>
 
           {/* Generated + Saved columns */}
-          <div className="flex-1 flex overflow-hidden">
-            <div className="relative flex-1 border-r overflow-hidden flex flex-col" style={{ borderColor: theme.border }}>
-              {/* Overlay when a Saved card is hovered — shows preview in Generated column */}
-              <ColumnPreviewOverlay url={previewHover?.side === 'left' ? previewHover.url : null} />
-              <WildcardList
-                theme={theme}
-                title="Generated"
-                items={generatedList.items}
-                total={generatedList.total}
-                isLoadingMore={generatedList.isLoadingMore}
-                hasMore={generatedList.hasMore}
-                onLoadMore={generatedList.loadMore}
-                isInitialLoad={generatedList.isInitialLoad}
-                clearConfirm={clearGeneratedConfirm}
-                onShowClearConfirm={() => setClearGeneratedConfirm(true)}
-                onCancelClear={() => setClearGeneratedConfirm(false)}
-                onClear={clearGenerated}
-                copiedId={copiedId}
-                lastGenerationTime={lastGenerationTime}
-                galleryEnabled={galleryEnabled}
-                galleryEmpty={galleryFiles.length === 0}
-                currentGalleryImageUrl={currentGalleryImageUrl}
-                onCopy={handleCopy}
-                onSave={saveToSavedList}
-                onRefine={(text) => setRefiningWildcard(text)}
-                onSetPreview={(id, url) => setPreviewForWildcard(id, url, 'generated')}
-                onRemovePreview={(id) => removePreviewForWildcard(id, 'generated')}
-                onRemove={removeGenerated}
-                onHoverChange={handleHoverChange}
-                previewSide="right"
-              />
-            </div>
-
-            <div className="relative flex-1 overflow-hidden flex flex-col">
-              {/* Overlay when a Generated card is hovered — shows preview in Saved column */}
-              <ColumnPreviewOverlay url={previewHover?.side === 'right' ? previewHover.url : null} />
-              <WildcardList
-                theme={theme}
-                title="Saved"
-                items={savedList.items}
-                total={savedList.total}
-                isLoadingMore={savedList.isLoadingMore}
-                hasMore={savedList.hasMore}
-                onLoadMore={savedList.loadMore}
-                isInitialLoad={savedList.isInitialLoad}
-                clearConfirm={clearSavedConfirm}
-                onShowClearConfirm={() => setClearSavedConfirm(true)}
-                onCancelClear={() => setClearSavedConfirm(false)}
-                onClear={clearSaved}
-                copiedId={copiedId}
-                galleryEnabled={galleryEnabled}
-                galleryEmpty={galleryFiles.length === 0}
-                currentGalleryImageUrl={currentGalleryImageUrl}
-                onCopy={handleCopy}
-                onRefine={(text) => setRefiningWildcard(text)}
-                onSetPreview={(id, url) => setPreviewForWildcard(id, url, 'saved')}
-                onRemovePreview={(id) => removePreviewForWildcard(id, 'saved')}
-                onRemove={removeSaved}
-                onHoverChange={handleHoverChange}
-                previewSide="left"
-              />
-            </div>
-          </div>
+          <WildcardsColumns
+            theme={theme}
+            generatedList={generatedList}
+            clearGeneratedConfirm={clearGeneratedConfirm}
+            setClearGeneratedConfirm={setClearGeneratedConfirm}
+            onClearGenerated={clearGenerated}
+            onSave={saveToSavedList}
+            onRemoveGenerated={removeGenerated}
+            savedList={savedList}
+            clearSavedConfirm={clearSavedConfirm}
+            setClearSavedConfirm={setClearSavedConfirm}
+            onClearSaved={clearSaved}
+            onRemoveSaved={removeSaved}
+            copiedId={copiedId}
+            lastGenerationTime={lastGenerationTime}
+            galleryEnabled={galleryEnabled}
+            galleryEmpty={galleryFiles.length === 0}
+            currentGalleryImageUrl={currentGalleryImageUrl}
+            onCopy={handleCopy}
+            onRefine={setRefiningWildcard}
+            onSetPreview={setPreviewForWildcard}
+            onRemovePreview={removePreviewForWildcard}
+          />
         </div>
       </main>
 
