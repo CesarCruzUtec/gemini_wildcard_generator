@@ -9,13 +9,12 @@
  *   GET  /api/gallery              → JSON list of image filenames, newest first
  *   GET  /gallery-images/:f        → serves the image file
  *
- * Wildcards (SQLite):
- *   GET    /api/wildcards?list=generated|saved   → ordered list
- *   POST   /api/wildcards                        → batch create { items[] }
- *   PATCH  /api/wildcards/:id                    → update { list?, previewUrl? }
- *   DELETE /api/wildcards/:id                    → delete one
- *   DELETE /api/wildcards?list=generated|saved   → clear a list
- *   POST   /api/wildcards/reorder                → { list, ids[] } sets positions
+ * Wildcards (SQLite, cursor-based pagination):
+ *   GET    /api/wildcards?list=&limit=50&cursor=&q=  → { items[], total, nextCursor }
+ *   POST   /api/wildcards                            → batch create { items[] }
+ *   PATCH  /api/wildcards/:id                        → update { list?, previewUrl? }
+ *   DELETE /api/wildcards/:id                        → delete one
+ *   DELETE /api/wildcards?list=generated|saved       → clear a list
  *
  * Costs (SQLite):
  *   GET   /api/costs                → { total: number, sessions: Session[] }
@@ -46,6 +45,8 @@ db.exec(`
     position    REAL NOT NULL DEFAULT 0,
     created_at  INTEGER NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS idx_wildcards_list_pos  ON wildcards(list, position ASC);
+  CREATE INDEX IF NOT EXISTS idx_wildcards_list_text ON wildcards(list, text);
   CREATE TABLE IF NOT EXISTS costs (
     id         TEXT PRIMARY KEY,
     type       TEXT NOT NULL CHECK(type IN ('session', 'total')),
@@ -150,12 +151,28 @@ const rowToItem = (r: any) => ({
   position: r.position as number,
 });
 
-// ── GET /api/wildcards?list= ──────────────────────────────────────────────────
+// ── GET /api/wildcards?list=&limit=&cursor=&q= ───────────────────────────────
+// Cursor-based pagination on `position`. New items are prepended at positions
+// below the cursor, so `position > cursor` never includes them on the next page.
+const MAX_LIMIT = 200;
 app.get('/api/wildcards', (req, res) => {
   const list = req.query.list as string;
   if (!['generated', 'saved'].includes(list)) return res.status(400).json({ error: 'Invalid list' });
-  const rows = db.prepare('SELECT * FROM wildcards WHERE list = ? ORDER BY position ASC, created_at DESC').all(list);
-  res.json((rows as any[]).map(rowToItem));
+
+  const limit = Math.min(Number(req.query.limit) || 50, MAX_LIMIT);
+  const cursor = req.query.cursor !== undefined && req.query.cursor !== '' ? Number(req.query.cursor) : null;
+  const q = req.query.q ? `%${req.query.q}%` : '%';
+
+  const rows = cursor !== null
+    ? db.prepare('SELECT * FROM wildcards WHERE list = ? AND text LIKE ? AND position > ? ORDER BY position ASC LIMIT ?').all(list, q, cursor, limit)
+    : db.prepare('SELECT * FROM wildcards WHERE list = ? AND text LIKE ? ORDER BY position ASC LIMIT ?').all(list, q, limit);
+
+  const totalRow = db.prepare('SELECT COUNT(*) as total FROM wildcards WHERE list = ? AND text LIKE ?').get(list, q) as any;
+  const total: number = totalRow?.total ?? 0;
+  const items = (rows as any[]).map(rowToItem);
+  const nextCursor: number | null = items.length > 0 ? items[items.length - 1].position : null;
+
+  res.json({ items, total, nextCursor });
 });
 
 // ── POST /api/wildcards  (batch insert/upsert) ────────────────────────────────
@@ -202,13 +219,6 @@ app.delete('/api/wildcards', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── POST /api/wildcards/reorder ───────────────────────────────────────────────
-app.post('/api/wildcards/reorder', (req, res) => {
-  const { list, ids } = req.body as { list: string; ids: string[] };
-  const stmt = db.prepare('UPDATE wildcards SET position = ? WHERE id = ? AND list = ?');
-  db.transaction(() => { ids.forEach((id, i) => stmt.run(i, id, list)); })();
-  res.json({ ok: true });
-});
 
 // ── GET /api/costs ────────────────────────────────────────────────────────────
 app.get('/api/costs', (_req, res) => {

@@ -3,21 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
-import { Reorder } from 'motion/react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Theme, WildcardItem } from '../types';
 import { WildcardCard } from './WildcardCard';
 
 interface Props {
   theme: Theme;
   title: string;
-  /** Filtered (search-matched) subset of the full list. */
-  items: WildcardItem[];
-  /** Unfiltered list (needed for merge-reorder). */
-  fullList: WildcardItem[];
-  onReorder: (merged: WildcardItem[]) => void;
+  /** Paginated items currently in memory. */
+  items?: WildcardItem[];
+  /** DB total (matching search) — shown in the header count. */
+  total: number;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  /** True during the very first page load — shows a full-column spinner. */
+  isInitialLoad: boolean;
   clearConfirm: boolean;
   onShowClearConfirm: () => void;
   onCancelClear: () => void;
@@ -38,24 +42,15 @@ interface Props {
   previewSide?: 'left' | 'right';
 }
 
-/** Merges a reordered filtered subset back into the full list, preserving non-filtered items' positions. */
-function mergeReorder<T extends { id: string }>(fullList: T[], filteredReordered: T[]): T[] {
-  const filteredIds = new Set(filteredReordered.map((item) => item.id));
-  const filteredIndexes = fullList.reduce<number[]>((acc, item, idx) => {
-    if (filteredIds.has(item.id)) acc.push(idx);
-    return acc;
-  }, []);
-  const result = [...fullList];
-  filteredIndexes.forEach((pos, i) => { result[pos] = filteredReordered[i]; });
-  return result;
-}
-
 export function WildcardList({
   theme,
   title,
   items,
-  fullList,
-  onReorder,
+  total,
+  isLoadingMore,
+  hasMore,
+  onLoadMore,
+  isInitialLoad,
   clearConfirm,
   onShowClearConfirm,
   onCancelClear,
@@ -73,6 +68,34 @@ export function WildcardList({
   onHoverChange,
   previewSide = 'right',
 }: Props) {
+  const safeItems = items ?? [];
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Virtual item count includes a sentinel loader row when there are more pages.
+  const count = hasMore ? safeItems.length + 1 : safeItems.length;
+
+  const virtualizer = useVirtualizer({
+    count,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 110,
+    overscan: 8,
+    measureElement:
+      typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
+        ? (element) => element?.getBoundingClientRect().height
+        : undefined,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  // Trigger loadMore when approaching the end of the loaded items.
+  useEffect(() => {
+    if (!hasMore || isLoadingMore) return;
+    const last = virtualItems[virtualItems.length - 1];
+    if (!last) return;
+    if (last.index >= safeItems.length - 5) {
+      onLoadMore();
+    }
+  }, [virtualItems, hasMore, isLoadingMore, safeItems.length, onLoadMore]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -80,13 +103,13 @@ export function WildcardList({
       <div className="border-b shrink-0" style={{ borderColor: theme.border }}>
         <div className="p-4 flex items-center justify-between gap-2">
           <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">
-            {title} ({items.length})
+            {title} ({total})
           </h2>
 
           <div className="flex items-center gap-1">
             <button
               onClick={onShowClearConfirm}
-              disabled={fullList.length === 0}
+              disabled={total === 0}
               className="flex items-center gap-1.5 px-2 py-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] font-medium"
             >
               <Trash2 className="w-3 h-3" /> Clear
@@ -110,7 +133,7 @@ export function WildcardList({
                 <p className="text-[10px] opacity-60 leading-tight">
                   Delete{' '}
                   <span className="font-bold text-red-500">
-                    {fullList.length} wildcard{fullList.length !== 1 ? 's' : ''}
+                    {total} wildcard{total !== 1 ? 's' : ''}
                   </span>{' '}
                   permanently?
                 </p>
@@ -135,37 +158,68 @@ export function WildcardList({
         </AnimatePresence>
       </div>
 
-      {/* Cards */}
-      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-        <Reorder.Group
-          axis="y"
-          values={items}
-          onReorder={(reordered) => onReorder(mergeReorder(fullList, reordered))}
-          className="flex flex-col gap-4"
-        >
-          <AnimatePresence mode="popLayout">
-            {items.map((item) => (
-              <WildcardCard
-                key={item.id}
-                theme={theme}
-                item={item}
-                isHighlighted={lastGenerationTime !== undefined && item.createdAt === lastGenerationTime}
-                copiedId={copiedId}
-                galleryEnabled={galleryEnabled}
-                galleryEmpty={galleryEmpty}
-                currentGalleryImageUrl={currentGalleryImageUrl}
-                onCopy={() => onCopy(item.text, item.id)}
-                onSave={onSave ? () => onSave(item) : undefined}
-                onRefine={() => onRefine(item.text)}
-                onSetPreview={() => onSetPreview(item.id, currentGalleryImageUrl)}
-                onRemove={() => onRemove(item.id)}
-                onHoverChange={onHoverChange}
-                previewSide={previewSide}
-              />
-            ))}
-          </AnimatePresence>
-        </Reorder.Group>
-      </div>
+      {/* Cards — virtualised */}
+      {isInitialLoad && isLoadingMore ? (
+        <div className="flex-1 flex items-center justify-center opacity-30">
+          <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        </div>
+      ) : (
+        <div ref={parentRef} className="flex-1 overflow-y-auto custom-scrollbar">
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+            {virtualItems.map((vRow) => {
+              const isLoaderRow = vRow.index >= safeItems.length;
+              return (
+                <div
+                  key={vRow.key}
+                  data-index={vRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${vRow.start}px)`,
+                  }}
+                >
+                  {isLoaderRow ? (
+                    <div className="flex items-center justify-center py-6 opacity-30">
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div style={{ padding: '0 1rem 1rem' }}>
+                      <WildcardCard
+                        theme={theme}
+                        item={safeItems[vRow.index]}
+                        isHighlighted={
+                          lastGenerationTime !== undefined &&
+                          safeItems[vRow.index].createdAt === lastGenerationTime
+                        }
+                        copiedId={copiedId}
+                        galleryEnabled={galleryEnabled}
+                        galleryEmpty={galleryEmpty}
+                        currentGalleryImageUrl={currentGalleryImageUrl}
+                        onCopy={() => onCopy(safeItems[vRow.index].text, safeItems[vRow.index].id)}
+                        onSave={onSave ? () => onSave(safeItems[vRow.index]) : undefined}
+                        onRefine={() => onRefine(safeItems[vRow.index].text)}
+                        onSetPreview={() => onSetPreview(safeItems[vRow.index].id, currentGalleryImageUrl)}
+                        onRemove={() => onRemove(safeItems[vRow.index].id)}
+                        onHoverChange={onHoverChange}
+                        previewSide={previewSide}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

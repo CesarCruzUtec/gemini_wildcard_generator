@@ -5,11 +5,30 @@
 
 import { WildcardItem } from '../types';
 
+export interface FetchListResult {
+  items: WildcardItem[];
+  total: number;
+  nextCursor: number | null;
+}
+
+export interface FetchListOpts {
+  limit?: number;
+  cursor?: number | null;
+  q?: string;
+}
+
 /** REST helpers – fire-and-forget for optimistic updates */
 export const dbApi = {
   // ── Wildcards ──────────────────────────────────────────────────────────────
-  fetchList: async (list: 'generated' | 'saved'): Promise<WildcardItem[]> => {
-    const res = await fetch(`/api/wildcards?list=${list}`);
+  fetchList: async (
+    list: 'generated' | 'saved',
+    opts: FetchListOpts = {},
+  ): Promise<FetchListResult> => {
+    const params = new URLSearchParams({ list });
+    if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts.cursor !== null && opts.cursor !== undefined) params.set('cursor', String(opts.cursor));
+    if (opts.q) params.set('q', opts.q);
+    const res = await fetch(`/api/wildcards?${params}`);
     return res.json();
   },
 
@@ -31,13 +50,6 @@ export const dbApi = {
 
   clearList: (list: 'generated' | 'saved') =>
     fetch(`/api/wildcards?list=${list}`, { method: 'DELETE' }),
-
-  reorder: (list: 'generated' | 'saved', ids: string[]) =>
-    fetch('/api/wildcards/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ list, ids }),
-    }),
 
   // ── Costs ──────────────────────────────────────────────────────────────────
   fetchCosts: async (): Promise<{ total: number }> => {

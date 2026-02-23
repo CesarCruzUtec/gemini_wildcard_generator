@@ -9,6 +9,8 @@ import { Theme, WildcardItem } from './types';
 import { THEMES, DEFAULT_SYSTEM_INSTRUCTION } from './constants';
 import { dbApi } from './api/dbApi';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useWildcardList } from './hooks/useWildcardList';
+import { useDebounce } from './hooks/useDebounce';
 
 import { Header } from './components/Header';
 import { SettingsOverlay } from './components/SettingsOverlay';
@@ -31,11 +33,12 @@ export default function App() {
 
   // ── Session-only state ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [allTimeCost, setAllTimeCost] = useState(0);
   const [sessionCost, setSessionCost] = useState(0);
   const [lastCallCost, setLastCallCost] = useState(0);
-  const [generatedWildcards, setGeneratedWildcards] = useState<WildcardItem[]>([]);
-  const [savedWildcards, setSavedWildcards] = useState<WildcardItem[]>([]);
+  const generatedList = useWildcardList('generated', debouncedSearch);
+  const savedList = useWildcardList('saved', debouncedSearch);
   const [lastGenerationTime, setLastGenerationTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -63,12 +66,7 @@ export default function App() {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    Promise.all([dbApi.fetchList('generated'), dbApi.fetchList('saved')])
-      .then(([generated, saved]) => {
-        setGeneratedWildcards(generated);
-        setSavedWildcards(saved);
-      })
-      .catch(() => {});
+    // Wildcard lists are loaded automatically by useWildcardList hooks.
 
     const label = new Date().toLocaleString();
     dbApi.createSession(label)
@@ -192,7 +190,7 @@ export default function App() {
           createdAt: generationTime,
         }));
 
-        setGeneratedWildcards((prev) => [...newItems, ...prev]);
+        generatedList.prepend(newItems);
         dbApi.add(newItems.map((item) => ({ ...item, list: 'generated' })));
       }
 
@@ -214,38 +212,36 @@ export default function App() {
   };
 
   const saveToSavedList = (item: WildcardItem) => {
-    if (savedWildcards.find((s) => s.text === item.text)) return;
+    if (savedList.items.find((s) => s.text === item.text)) return;
     const newItem: WildcardItem = { ...item, id: crypto.randomUUID() };
-    setSavedWildcards((prev) => [newItem, ...prev]);
+    savedList.prepend([newItem]);
     dbApi.add([{ ...newItem, list: 'saved' }]);
   };
 
   const setPreviewForWildcard = (id: string, imageUrl: string, listType: 'generated' | 'saved') => {
-    const updater = (prev: WildcardItem[]) =>
-      prev.map((w) => (w.id === id ? { ...w, previewUrl: imageUrl } : w));
-    if (listType === 'generated') setGeneratedWildcards(updater);
-    else setSavedWildcards(updater);
+    if (listType === 'generated') generatedList.update(id, { previewUrl: imageUrl });
+    else savedList.update(id, { previewUrl: imageUrl });
     dbApi.patch(id, { previewUrl: imageUrl });
   };
 
   const removeSaved = (id: string) => {
-    setSavedWildcards((prev) => prev.filter((s) => s.id !== id));
+    savedList.remove(id);
     dbApi.remove(id);
   };
 
   const removeGenerated = (id: string) => {
-    setGeneratedWildcards((prev) => prev.filter((s) => s.id !== id));
+    generatedList.remove(id);
     dbApi.remove(id);
   };
 
   const clearSaved = () => {
-    setSavedWildcards([]);
+    savedList.clear();
     dbApi.clearList('saved');
     setClearSavedConfirm(false);
   };
 
   const clearGenerated = () => {
-    setGeneratedWildcards([]);
+    generatedList.clear();
     dbApi.clearList('generated');
     setClearGeneratedConfirm(false);
   };
@@ -296,8 +292,8 @@ export default function App() {
 
   const handleResetDb = async () => {
     await dbApi.resetDb();
-    setGeneratedWildcards([]);
-    setSavedWildcards([]);
+    generatedList.clear();
+    savedList.clear();
     setAllTimeCost(0);
     setSessionCost(0);
     setLastCallCost(0);
@@ -311,14 +307,6 @@ export default function App() {
     setShowResetConfirm(false);
     setShowSettings(false);
   };
-
-  // ── Filtered lists ───────────────────────────────────────────────────────
-  const filteredGenerated = generatedWildcards.filter((w) =>
-    w.text.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-  const filteredSaved = savedWildcards.filter((w) =>
-    w.text.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -341,8 +329,8 @@ export default function App() {
       <ResetDbModal
         theme={theme}
         show={showResetConfirm}
-        generatedCount={generatedWildcards.length}
-        savedCount={savedWildcards.length}
+        generatedCount={generatedList.total}
+        savedCount={savedList.total}
         allTimeCost={allTimeCost}
         onClose={() => setShowResetConfirm(false)}
         onReset={handleResetDb}
@@ -430,12 +418,12 @@ export default function App() {
               <WildcardList
                 theme={theme}
                 title="Generated"
-                items={filteredGenerated}
-                fullList={generatedWildcards}
-                onReorder={(merged) => {
-                  setGeneratedWildcards(merged);
-                  dbApi.reorder('generated', merged.map((w) => w.id));
-                }}
+                items={generatedList.items}
+                total={generatedList.total}
+                isLoadingMore={generatedList.isLoadingMore}
+                hasMore={generatedList.hasMore}
+                onLoadMore={generatedList.loadMore}
+                isInitialLoad={generatedList.isInitialLoad}
                 clearConfirm={clearGeneratedConfirm}
                 onShowClearConfirm={() => setClearGeneratedConfirm(true)}
                 onCancelClear={() => setClearGeneratedConfirm(false)}
@@ -459,12 +447,12 @@ export default function App() {
               <WildcardList
                 theme={theme}
                 title="Saved"
-                items={filteredSaved}
-                fullList={savedWildcards}
-                onReorder={(merged) => {
-                  setSavedWildcards(merged);
-                  dbApi.reorder('saved', merged.map((w) => w.id));
-                }}
+                items={savedList.items}
+                total={savedList.total}
+                isLoadingMore={savedList.isLoadingMore}
+                hasMore={savedList.hasMore}
+                onLoadMore={savedList.loadMore}
+                isInitialLoad={savedList.isInitialLoad}
                 clearConfirm={clearSavedConfirm}
                 onShowClearConfirm={() => setClearSavedConfirm(true)}
                 onCancelClear={() => setClearSavedConfirm(false)}

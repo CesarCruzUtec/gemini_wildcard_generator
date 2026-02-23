@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { Save, Sparkles, Image as ImageIcon, Trash2, Check } from 'lucide-react';
-import { Reorder } from 'motion/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Theme, WildcardItem } from '../types';
 import { cn } from '../utils/cn';
@@ -50,14 +49,9 @@ export function WildcardCard({
   const hasPreview = Boolean(item.previewUrl);
 
   return (
-    <Reorder.Item
-      value={item}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      dragListener={true}
+    <div
       className={cn(
-        'group relative border rounded-xl transition-colors cursor-grab active:cursor-grabbing overflow-hidden select-none',
+        'group relative border rounded-xl transition-colors overflow-hidden',
         isHighlighted && 'ring-1',
       )}
       style={{
@@ -148,6 +142,6 @@ export function WildcardCard({
           </motion.div>
         )}
       </AnimatePresence>
-    </Reorder.Item>
+    </div>
   );
 }
