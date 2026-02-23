@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import {
   Download,
@@ -146,8 +146,8 @@ export default function App() {
   const [numToGenerate, setNumToGenerate] = useState(5);
   const [totalCost, setTotalCost] = useState(0);
   const [lastCallCost, setLastCallCost] = useState(0);
-  const [generatedWildcards, setGeneratedWildcards] = useState<{ id: string; text: string; createdAt: number }[]>([]);
-  const [savedWildcards, setSavedWildcards] = useState<{ id: string; text: string; createdAt: number }[]>([]);
+  const [generatedWildcards, setGeneratedWildcards] = useState<{ id: string; text: string; createdAt: number; previewUrl?: string }[]>([]);
+  const [savedWildcards, setSavedWildcards] = useState<{ id: string; text: string; createdAt: number; previewUrl?: string }[]>([]);
   const [lastGenerationTime, setLastGenerationTime] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
@@ -156,8 +156,29 @@ export default function App() {
   const [showGuide, setShowGuide] = useState(false);
   const [refiningWildcard, setRefiningWildcard] = useState<string | null>(null);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryLoading, setGalleryLoading] = useState(true);
+  const [previewHover, setPreviewHover] = useState<{ url: string; x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchGallery = async () => {
+      try {
+        const res = await fetch('/api/gallery');
+        const data = await res.json();
+        setGalleryFiles(data.files ?? []);
+      } catch {
+        // server not running or no images
+      } finally {
+        setGalleryLoading(false);
+      }
+    };
+    fetchGallery();
+    const id = setInterval(fetchGallery, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const resizeImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -293,9 +314,17 @@ export default function App() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const saveToSavedList = (item: { id: string; text: string; createdAt: number }) => {
+  const saveToSavedList = (item: { id: string; text: string; createdAt: number; previewUrl?: string }) => {
     if (!savedWildcards.find(s => s.text === item.text)) {
       setSavedWildcards(prev => [item, ...prev]);
+    }
+  };
+
+  const setPreviewForWildcard = (id: string, imageUrl: string, listType: 'generated' | 'saved') => {
+    if (listType === 'generated') {
+      setGeneratedWildcards(prev => prev.map(w => w.id === id ? { ...w, previewUrl: imageUrl } : w));
+    } else {
+      setSavedWildcards(prev => prev.map(w => w.id === id ? { ...w, previewUrl: imageUrl } : w));
     }
   };
 
@@ -699,7 +728,81 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex-1" />
+          {/* Gallery Viewer */}
+          <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden border-t" style={{ borderColor: theme.border }}>
+            <div className="flex items-center justify-between shrink-0">
+              <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Output Gallery</label>
+              <div className="flex items-center gap-2">
+                {galleryFiles.length > 0 && (
+                  <span className="text-[10px] font-mono opacity-30">
+                    {galleryIndex + 1} / {galleryFiles.length}
+                  </span>
+                )}
+                <button
+                  onClick={async () => {
+                    setGalleryLoading(true);
+                    try {
+                      const res = await fetch('/api/gallery');
+                      const data = await res.json();
+                      setGalleryFiles(data.files ?? []);
+                      setGalleryIndex(0);
+                    } catch {}
+                    setGalleryLoading(false);
+                  }}
+                  className="p-1 rounded-md hover:opacity-100 opacity-40 transition-opacity"
+                  title="Refresh gallery"
+                >
+                  <RefreshCw className={cn("w-3 h-3", galleryLoading && "animate-spin")} />
+                </button>
+              </div>
+            </div>
+
+            {galleryLoading ? (
+              <div className="flex-1 flex items-center justify-center opacity-20">
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              </div>
+            ) : galleryFiles.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-20">
+                <ImageIcon className="w-6 h-6" />
+                <span className="text-[10px] uppercase tracking-wider">No images found</span>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="flex-1 rounded-xl overflow-hidden relative"
+                  style={{ backgroundColor: theme.input }}
+                >
+                  <img
+                    key={galleryFiles[galleryIndex]}
+                    src={`/gallery-images/${galleryFiles[galleryIndex]}`}
+                    className="w-full h-full object-contain"
+                    alt={galleryFiles[galleryIndex]}
+                  />
+                </div>
+                <p className="text-[9px] font-mono opacity-30 truncate shrink-0 text-center">
+                  {galleryFiles[galleryIndex]}
+                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setGalleryIndex(i => Math.max(0, i - 1))}
+                    disabled={galleryIndex === 0}
+                    className="flex-1 h-7 rounded-lg text-xs font-medium disabled:opacity-20 transition-opacity"
+                    style={{ backgroundColor: theme.input, color: theme.text }}
+                  >
+                    ← Prev
+                  </button>
+                  <button
+                    onClick={() => setGalleryIndex(i => Math.min(galleryFiles.length - 1, i + 1))}
+                    disabled={galleryIndex === galleryFiles.length - 1}
+                    className="flex-1 h-7 rounded-lg text-xs font-medium disabled:opacity-20 transition-opacity"
+                    style={{ backgroundColor: theme.input, color: theme.text }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Cost Summary Section */}
           <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: theme.border, backgroundColor: theme.input }}>
@@ -767,7 +870,19 @@ export default function App() {
                           '--tw-ring-color': theme.accent
                         } as any}
                         onClick={() => handleCopy(item.text, item.id)}
+                        onMouseEnter={(e) => {
+                          if (item.previewUrl) {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setPreviewHover({ url: item.previewUrl, x: rect.right, y: rect.top });
+                          }
+                        }}
+                        onMouseLeave={() => setPreviewHover(null)}
                       >
+                        {item.previewUrl && (
+                          <div className="absolute top-2 right-2 w-8 h-8 rounded-md overflow-hidden border z-10 opacity-70 pointer-events-none" style={{ borderColor: theme.border }}>
+                            <img src={item.previewUrl} className="w-full h-full object-cover" />
+                          </div>
+                        )}
                         <div className="p-4">
                           <p className="text-[11px] font-mono opacity-60 leading-relaxed whitespace-pre-wrap break-words">
                             {item.text}
@@ -778,6 +893,7 @@ export default function App() {
                             onClick={(e) => { e.stopPropagation(); saveToSavedList(item); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                            title="Save"
                           >
                             <Save className="w-3 h-3" />
                           </button>
@@ -785,13 +901,24 @@ export default function App() {
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                            title="Refine"
                           >
                             <Sparkles className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPreviewForWildcard(item.id, `/gallery-images/${galleryFiles[galleryIndex]}`, 'generated'); }}
+                            disabled={galleryFiles.length === 0}
+                            className="p-1.5 border rounded-md transition-all shadow-sm disabled:opacity-20"
+                            style={{ backgroundColor: item.previewUrl ? theme.accent : theme.card, borderColor: item.previewUrl ? theme.accent : theme.border, color: item.previewUrl ? (theme.id === 'dark' ? '#000' : '#fff') : undefined }}
+                            title="Set current gallery image as preview"
+                          >
+                            <ImageIcon className="w-3 h-3" />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); removeGenerated(item.id); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                            title="Delete"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -855,7 +982,19 @@ export default function App() {
                         className="group relative border rounded-xl transition-colors cursor-grab active:cursor-grabbing overflow-hidden select-none"
                         style={{ backgroundColor: theme.card, borderColor: theme.border }}
                         onClick={() => handleCopy(item.text, item.id)}
+                        onMouseEnter={(e) => {
+                          if (item.previewUrl) {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setPreviewHover({ url: item.previewUrl, x: rect.right, y: rect.top });
+                          }
+                        }}
+                        onMouseLeave={() => setPreviewHover(null)}
                       >
+                        {item.previewUrl && (
+                          <div className="absolute top-2 right-2 w-8 h-8 rounded-md overflow-hidden border z-10 opacity-70 pointer-events-none" style={{ borderColor: theme.border }}>
+                            <img src={item.previewUrl} className="w-full h-full object-cover" />
+                          </div>
+                        )}
                         <div className="p-4">
                           <p className="text-[11px] font-mono opacity-60 leading-relaxed whitespace-pre-wrap break-words">
                             {item.text}
@@ -866,13 +1005,24 @@ export default function App() {
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                            title="Refine"
                           >
                             <Sparkles className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPreviewForWildcard(item.id, `/gallery-images/${galleryFiles[galleryIndex]}`, 'saved'); }}
+                            disabled={galleryFiles.length === 0}
+                            className="p-1.5 border rounded-md transition-all shadow-sm disabled:opacity-20"
+                            style={{ backgroundColor: item.previewUrl ? theme.accent : theme.card, borderColor: item.previewUrl ? theme.accent : theme.border, color: item.previewUrl ? (theme.id === 'dark' ? '#000' : '#fff') : undefined }}
+                            title="Set current gallery image as preview"
+                          >
+                            <ImageIcon className="w-3 h-3" />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); removeSaved(item.id); }}
                             className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
+                            title="Delete"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -902,6 +1052,27 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Floating preview on wildcard hover */}
+      {previewHover && (
+        <div
+          className="fixed z-[200] pointer-events-none rounded-xl overflow-hidden shadow-2xl border"
+          style={{
+            left: Math.min(previewHover.x + 10, window.innerWidth - 220),
+            top: Math.max(8, Math.min(previewHover.y, window.innerHeight - 220)),
+            width: 210,
+            height: 210,
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }}
+        >
+          <img
+            src={previewHover.url}
+            className="w-full h-full object-contain"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+      )}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
