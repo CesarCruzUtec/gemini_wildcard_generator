@@ -106,13 +106,18 @@ app.patch('/api/config', (req, res) => {
 });
 
 // ── GET /api/gallery ──────────────────────────────────────────────────────────
+// Files modified within this window may still be partially written by the generator
+const WRITE_SETTLE_MS = 2500;
+
 app.get('/api/gallery', (_req, res) => {
   const dir = getGalleryDir();
   if (!dir) return res.json({ files: [] });
   try {
+    const now = Date.now();
     const files = fs.readdirSync(dir)
       .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .map(f => ({ name: f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .map(f => { const stat = fs.statSync(path.join(dir, f)); return { name: f, mtime: stat.mtimeMs, size: stat.size }; })
+      .filter(f => now - f.mtime > WRITE_SETTLE_MS) // skip files still being written
       .sort((a, b) => b.mtime - a.mtime)
       .map(f => f.name);
     res.json({ files });
@@ -130,6 +135,8 @@ app.get('/gallery-images/:filename', (req, res) => {
   if (!filePath.startsWith(path.resolve(dir))) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  // Prevent browser from caching partially-written images
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(filePath);
 });
 

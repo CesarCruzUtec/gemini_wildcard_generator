@@ -10,6 +10,8 @@ interface PreviewHoverState {
   url: string;
   x: number;
   y: number;
+  /** Which side of the card the popup should appear on. */
+  side: 'left' | 'right';
 }
 
 interface Props {
@@ -17,15 +19,18 @@ interface Props {
   previewHover: PreviewHoverState | null;
 }
 
-const PREVIEW_SIZE = 210;
-const PREVIEW_OFFSET = 10;
+const PREVIEW_SIZE = 480;
+const PREVIEW_OFFSET = 12;
 const SCREEN_PADDING = 8;
 
 export function PreviewHover({ theme, previewHover }: Props) {
   if (!previewHover) return null;
 
-  const left = Math.min(previewHover.x + PREVIEW_OFFSET, window.innerWidth - PREVIEW_SIZE);
-  const top = Math.max(SCREEN_PADDING, Math.min(previewHover.y, window.innerHeight - PREVIEW_SIZE));
+  const left =
+    previewHover.side === 'right'
+      ? Math.min(previewHover.x + PREVIEW_OFFSET, window.innerWidth - PREVIEW_SIZE - SCREEN_PADDING)
+      : Math.max(SCREEN_PADDING, previewHover.x - PREVIEW_SIZE - PREVIEW_OFFSET);
+  const top = Math.max(SCREEN_PADDING, Math.min(previewHover.y, window.innerHeight - PREVIEW_SIZE - SCREEN_PADDING));
 
   return (
     <div

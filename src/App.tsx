@@ -49,7 +49,7 @@ export default function App() {
   const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryLoading, setGalleryLoading] = useState(true);
-  const [previewHover, setPreviewHover] = useState<{ url: string; x: number; y: number } | null>(null);
+  const [previewHover, setPreviewHover] = useState<{ url: string; x: number; y: number; side: 'left' | 'right' } | null>(null);
   const [clearGeneratedConfirm, setClearGeneratedConfirm] = useState(false);
   const [clearSavedConfirm, setClearSavedConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -250,8 +250,8 @@ export default function App() {
     setClearGeneratedConfirm(false);
   };
 
-  const handleHoverChange = (url: string | null, x?: number, y?: number) => {
-    setPreviewHover(url && x !== undefined && y !== undefined ? { url, x, y } : null);
+  const handleHoverChange = (url: string | null, x?: number, y?: number, side: 'left' | 'right' = 'right') => {
+    setPreviewHover(url && x !== undefined && y !== undefined ? { url, x, y, side } : null);
   };
 
   // ── Settings handlers ────────────────────────────────────────────────────
@@ -451,6 +451,7 @@ export default function App() {
                 onSetPreview={(id, url) => setPreviewForWildcard(id, url, 'generated')}
                 onRemove={removeGenerated}
                 onHoverChange={handleHoverChange}
+                previewSide="right"
               />
             </div>
 
@@ -477,6 +478,7 @@ export default function App() {
                 onSetPreview={(id, url) => setPreviewForWildcard(id, url, 'saved')}
                 onRemove={removeSaved}
                 onHoverChange={handleHoverChange}
+                previewSide="left"
               />
             </div>
           </div>

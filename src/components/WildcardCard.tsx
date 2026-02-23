@@ -25,7 +25,9 @@ interface Props {
   onRefine: () => void;
   onSetPreview: () => void;
   onRemove: () => void;
-  onHoverChange: (url: string | null, x?: number, y?: number) => void;
+  onHoverChange: (url: string | null, x?: number, y?: number, side?: 'left' | 'right') => void;
+  /** Which side of the card to show the preview popup. Default: 'right' */
+  previewSide?: 'left' | 'right';
 }
 
 export function WildcardCard({
@@ -42,6 +44,7 @@ export function WildcardCard({
   onSetPreview,
   onRemove,
   onHoverChange,
+  previewSide = 'right',
 }: Props) {
   const isCopied = copiedId === item.id;
   const hasPreview = Boolean(item.previewUrl);
@@ -66,7 +69,8 @@ export function WildcardCard({
       onMouseEnter={(e) => {
         if (item.previewUrl) {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          onHoverChange(item.previewUrl, rect.right, rect.top);
+          const anchorX = previewSide === 'right' ? rect.right : rect.left;
+          onHoverChange(item.previewUrl, anchorX, rect.top, previewSide);
         }
       }}
       onMouseLeave={() => onHoverChange(null)}

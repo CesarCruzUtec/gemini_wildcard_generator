@@ -34,7 +34,8 @@ interface Props {
   onRefine: (text: string) => void;
   onSetPreview: (id: string, url: string) => void;
   onRemove: (id: string) => void;
-  onHoverChange: (url: string | null, x?: number, y?: number) => void;
+  onHoverChange: (url: string | null, x?: number, y?: number, side?: 'left' | 'right') => void;
+  previewSide?: 'left' | 'right';
 }
 
 /** Merges a reordered filtered subset back into the full list, preserving non-filtered items' positions. */
@@ -70,6 +71,7 @@ export function WildcardList({
   onSetPreview,
   onRemove,
   onHoverChange,
+  previewSide = 'right',
 }: Props) {
 
   return (
@@ -158,6 +160,7 @@ export function WildcardList({
                 onSetPreview={() => onSetPreview(item.id, currentGalleryImageUrl)}
                 onRemove={() => onRemove(item.id)}
                 onHoverChange={onHoverChange}
+                previewSide={previewSide}
               />
             ))}
           </AnimatePresence>
