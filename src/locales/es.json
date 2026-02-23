@@ -1,0 +1,129 @@
+{
+  "header": {
+    "appName": "Wildcard Studio",
+    "noApiKey": "Sin API Key",
+    "noGallery": "Sin Galería",
+    "theme": "Tema",
+    "language": "Idioma",
+    "guide": "Guía",
+    "settings": "Ajustes"
+  },
+  "input": {
+    "requestLabel": "Solicitud",
+    "requestPlaceholder": "ej., ropa cyberpunk...",
+    "referenceImages": "Imágenes de referencia ({{count}}/4)",
+    "countLabel": "Cantidad",
+    "generate": "Generar",
+    "surpriseMe": "Sorpréndeme"
+  },
+  "gallery": {
+    "title": "Galería de salida",
+    "refresh": "Actualizar galería",
+    "noFolder": "Sin carpeta de galería",
+    "configureSettings": "Configurar en Ajustes",
+    "noImages": "No se encontraron imágenes",
+    "expand": "Clic para ampliar",
+    "prev": "← Anterior",
+    "next": "Siguiente →"
+  },
+  "costs": {
+    "lastCall": "Última llamada",
+    "thisSession": "Esta sesión",
+    "allTime": "Total acumulado"
+  },
+  "settings": {
+    "systemInstructions": "Instrucciones del sistema",
+    "resetToDefault": "Restaurar predeterminado",
+    "apiKeyLabel": "API Key de Gemini",
+    "apiKeyPlaceholder": "Ingresa tu API Key de Gemini...",
+    "apply": "Aplicar",
+    "apiKeyNote": "Guardada en la base de datos local. Tu clave nunca sale de tu máquina.",
+    "galleryFolderLabel": "Carpeta de galería",
+    "galleryPlaceholder": "/ruta/a/ComfyUI/output",
+    "galleryNote": "Ruta absoluta a tu carpeta de imágenes (ej., directorio output de ComfyUI). Dejar vacío para desactivar la galería.",
+    "closeSettings": "Cerrar ajustes",
+    "resetDatabase": "Reiniciar base de datos"
+  },
+  "card": {
+    "save": "Guardar",
+    "refine": "Refinar",
+    "preview": "Vista previa",
+    "delete": "Eliminar"
+  },
+  "list": {
+    "generated": "Generados",
+    "saved": "Guardados",
+    "clear": "Limpiar",
+    "deleteAll": "Eliminar todo",
+    "cancel": "Cancelar",
+    "deleteConfirm_one": "¿Eliminar permanentemente <b>{{count}} wildcard</b>?",
+    "deleteConfirm_other": "¿Eliminar permanentemente <b>{{count}} wildcards</b>?"
+  },
+  "search": {
+    "placeholder": "Buscar wildcards..."
+  },
+  "refineBar": {
+    "instruction": "Refinando este wildcard — escribe tus instrucciones en la barra lateral y presiona Generar"
+  },
+  "resetModal": {
+    "title": "Reiniciar base de datos",
+    "subtitle": "Esta acción no se puede deshacer",
+    "description": "Lo siguiente se eliminará permanentemente:",
+    "generatedWildcards": "Wildcards generados",
+    "savedWildcards": "Wildcards guardados",
+    "allTimeCost": "Costo total acumulado",
+    "apiKeyGallery": "API Key y ruta de galería",
+    "cleared": "eliminado",
+    "cancel": "Cancelar",
+    "resetEverything": "Reiniciar todo"
+  },
+  "guide": {
+    "title": "Cómo usar Wildcard Studio",
+    "gotIt": "Entendido",
+    "footer": "Todos los datos se guardan localmente — nada se envía a la nube excepto tus prompts a la API de Gemini.",
+    "step1": {
+      "title": "Configuración inicial",
+      "p1": "Haz clic en el icono de <b>Ajustes</b> en la esquina superior derecha.",
+      "p2": "Pega tu <b>API Key de Gemini</b> — es necesaria para generar wildcards. La clave se guarda localmente y nunca se envía a ningún lugar excepto a la API de Gemini.",
+      "p3": "Opcionalmente, configura una <b>Carpeta de galería</b> — apunta a cualquier carpeta de imágenes en tu computadora (ej., tu carpeta output de ComfyUI). Esto activa la galería de imágenes en la barra lateral. Déjalo en blanco si no necesitas vistas previas.",
+      "p4": "Un badge de advertencia en el encabezado te recuerda si falta la API Key."
+    },
+    "step2": {
+      "title": "Generar wildcards",
+      "p1": "Escribe una descripción en el campo <b>Solicitud</b> en la barra lateral izquierda — por ejemplo: <i>\"estilos de iluminación cinemáticos\"</i> o <i>\"adjetivos de criaturas fantásticas\"</i>.",
+      "p2": "Opcionalmente, sube hasta <b>4 imágenes de referencia</b> para guiar visualmente a la IA (arrastra y suelta o haz clic en el área de imágenes).",
+      "p3": "Ajusta el campo <b>Cantidad</b> para indicar cuántos wildcards generar y presiona <b>Generar</b>.",
+      "p4": "El botón <b>Sorpréndeme</b> limpia tu prompt y genera un lote aleatorio — ideal para inspirarte.",
+      "p5": "Los nuevos wildcards aparecen al inicio de la columna <b>Generados</b> a la derecha, resaltados brevemente para que puedas identificarlos.",
+      "note": "<b>Nota:</b> Por defecto, la IA está configurada para generar wildcards de <b>ropa y poses</b>. Si deseas generar otro tipo, abre Ajustes y edita la <b>Instrucción del sistema</b> para describir qué tipo de wildcards necesitas."
+    },
+    "step3": {
+      "title": "Refinar un wildcard",
+      "p1": "Haz clic en <b>Refinar</b> en cualquier tarjeta. Aparecerá una barra en la parte inferior con el wildcard seleccionado como base.",
+      "p2": "Escribe instrucciones de refinamiento en el campo <b>Solicitud</b> (ej. <i>\"hacerlo más dramático\"</i>) y haz clic en <b>Generar</b>. La IA producirá variaciones basadas en ese wildcard específico.",
+      "p3": "Haz clic en la <b>×</b> en la barra de refinamiento para cancelar y volver a la generación normal."
+    },
+    "step4": {
+      "title": "Copiar y guardar",
+      "p1": "<b>Haz clic en cualquier lugar del texto</b> de una tarjeta para copiarlo al portapapeles. Una breve confirmación aparecerá en la tarjeta.",
+      "p2": "Haz clic en <b>Guardar</b> en una tarjeta Generada para moverla a tu lista <b>Guardados</b> permanente. Los wildcards guardados persisten entre sesiones.",
+      "p3": "Usa el botón <b>Eliminar</b> para quitar una tarjeta, o el botón <b>Limpiar</b> en el encabezado de la columna para eliminar todas (un paso de confirmación evita accidentes)."
+    },
+    "step5": {
+      "title": "Buscar",
+      "p1": "Usa la <b>barra de búsqueda</b> en la parte superior para filtrar ambas columnas simultáneamente. Los resultados se actualizan mientras escribes. Se busca en toda la base de datos, no solo en lo que está cargado.",
+      "p2": "Limpia el campo de búsqueda para ver todos los wildcards."
+    },
+    "step6": {
+      "title": "Galería y vistas previas",
+      "p1": "Si se configura una carpeta de galería, un panel en la barra lateral muestra todas las imágenes. Usa las <b>flechas</b> para navegar o el icono de <b>actualizar</b> para recargar.",
+      "p2": "Navega a la imagen que deseas asociar con un wildcard y haz clic en <b>Vista previa</b> en esa tarjeta. Aparecerá una miniatura en el lado derecho de la tarjeta.",
+      "p3": "Pasa el cursor sobre una tarjeta con vista previa — la imagen completa aparece como superposición difuminada en la columna opuesta.",
+      "p4": "Haz clic en el botón <b>×</b> en la miniatura para eliminar el enlace de vista previa de esa tarjeta."
+    },
+    "step7": {
+      "title": "Visor de galería",
+      "p1": "Haz clic en cualquier imagen en la galería lateral para verla en pantalla completa. Navega entre imágenes con los botones <b>← →</b>, las <b>teclas de flecha</b> del teclado o la <b>rueda del ratón</b>. Las imágenes se deslizan con animación estilo Tinder. Haz clic fuera de la imagen o presiona <b>Esc</b> para cerrar."
+    }
+  }
+}

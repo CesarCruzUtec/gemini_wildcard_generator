@@ -6,6 +6,7 @@
 import React from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { Theme } from '../types';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function RefineBar({ theme, refiningWildcard, onClear }: Props) {
+  const { t } = useTranslation();
   return (
     <AnimatePresence>
       {refiningWildcard && (
@@ -34,7 +36,7 @@ export function RefineBar({ theme, refiningWildcard, onClear }: Props) {
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="w-3 h-3 shrink-0" style={{ color: theme.accent }} />
                   <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">
-                    Refining this wildcard — type your instructions in the sidebar and hit Generate
+                    {t('refineBar.instruction')}
                   </span>
                 </div>
                 <p className="text-sm font-mono leading-relaxed opacity-70 whitespace-pre-wrap break-words line-clamp-3">

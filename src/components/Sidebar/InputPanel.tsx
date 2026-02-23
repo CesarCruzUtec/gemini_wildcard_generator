@@ -5,6 +5,7 @@
 
 import React, { useRef } from 'react';
 import { RefreshCw, Plus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Theme } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -34,6 +35,7 @@ export function InputPanel({
   onSurprise,
 }: Props) {
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).slice(0, 4 - referenceImages.length);
@@ -57,11 +59,11 @@ export function InputPanel({
     <div className="p-6 space-y-4 border-b overflow-y-auto custom-scrollbar" style={{ borderColor: theme.border }}>
       {/* Prompt */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Request</label>
+        <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('input.requestLabel')}</label>
         <textarea
           value={userPrompt}
           onChange={(e) => setUserPrompt(e.target.value)}
-          placeholder="e.g., cyberpunk street wear..."
+          placeholder={t('input.requestPlaceholder')}
           className="w-full h-24 border-none rounded-lg p-3 text-sm focus:ring-1 transition-all resize-none placeholder:opacity-20"
           style={{
             backgroundColor: theme.input,
@@ -75,7 +77,7 @@ export function InputPanel({
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">
-            Reference Images ({referenceImages.length}/4)
+            {t('input.referenceImages', { count: referenceImages.length })}
           </label>
           <button
             onClick={() => imageInputRef.current?.click()}
@@ -110,7 +112,7 @@ export function InputPanel({
 
       {/* Count */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Count</label>
+        <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('input.countLabel')}</label>
         <input
           type="number"
           min="1"
@@ -134,13 +136,13 @@ export function InputPanel({
           className="flex-1 h-10 text-xs font-medium rounded-lg disabled:opacity-20 transition-all flex items-center justify-center gap-2"
           style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
         >
-          {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Generate'}
+          {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : t('input.generate')}
         </button>
         <button
           onClick={onSurprise}
           disabled={isLoading}
           className="w-10 h-10 rounded-lg transition-all flex items-center justify-center"
-          title="Surprise Me"
+          title={t('input.surpriseMe')}
           style={{ backgroundColor: theme.input, color: theme.muted }}
         >
           <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />

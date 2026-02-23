@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { RefreshCw, FolderOpen, Image as ImageIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Theme } from '../../types';
 import { cn } from '../../utils/cn';
 import { GalleryLightbox } from '../modals/GalleryLightbox';
@@ -31,6 +32,7 @@ export function GalleryViewer({
   onOpenSettings,
 }: Props) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div
@@ -39,7 +41,7 @@ export function GalleryViewer({
     >
       {/* Header row */}
       <div className="flex items-center justify-between shrink-0">
-        <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Output Gallery</label>
+        <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('gallery.title')}</label>
         <div className="flex items-center gap-2">
           {galleryFiles.length > 0 && (
             <span className="text-[10px] font-mono opacity-30">
@@ -49,7 +51,7 @@ export function GalleryViewer({
           <button
             onClick={onRefresh}
             className="p-1 rounded-md hover:opacity-100 opacity-40 transition-opacity"
-            title="Refresh gallery"
+            title={t('gallery.refresh')}
           >
             <RefreshCw className={cn('w-3 h-3', galleryLoading && 'animate-spin')} />
           </button>
@@ -60,9 +62,9 @@ export function GalleryViewer({
       {!galleryEnabled ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center p-4 opacity-30">
           <FolderOpen className="w-6 h-6" />
-          <span className="text-[10px] uppercase tracking-wider">No gallery folder set</span>
+          <span className="text-[10px] uppercase tracking-wider">{t('gallery.noFolder')}</span>
           <button onClick={onOpenSettings} className="text-[10px] underline underline-offset-2 mt-1">
-            Configure in Settings
+            {t('gallery.configureSettings')}
           </button>
         </div>
       ) : galleryLoading ? (
@@ -72,7 +74,7 @@ export function GalleryViewer({
       ) : galleryFiles.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-20">
           <ImageIcon className="w-6 h-6" />
-          <span className="text-[10px] uppercase tracking-wider">No images found</span>
+          <span className="text-[10px] uppercase tracking-wider">{t('gallery.noImages')}</span>
         </div>
       ) : (
         <>
@@ -80,7 +82,7 @@ export function GalleryViewer({
             className="flex-1 rounded-xl overflow-hidden relative cursor-zoom-in"
             style={{ backgroundColor: theme.input }}
             onClick={() => setLightboxOpen(true)}
-            title="Click to expand"
+            title={t('gallery.expand')}
           >
             <img
               key={galleryFiles[galleryIndex]}
@@ -99,7 +101,7 @@ export function GalleryViewer({
               className="flex-1 h-7 rounded-lg text-xs font-medium disabled:opacity-20 transition-opacity"
               style={{ backgroundColor: theme.input, color: theme.text }}
             >
-              ← Prev
+              {t('gallery.prev')}
             </button>
             <button
               onClick={() => setGalleryIndex((i) => Math.min(galleryFiles.length - 1, i + 1))}
@@ -107,7 +109,7 @@ export function GalleryViewer({
               className="flex-1 h-7 rounded-lg text-xs font-medium disabled:opacity-20 transition-opacity"
               style={{ backgroundColor: theme.input, color: theme.text }}
             >
-              Next →
+              {t('gallery.next')}
             </button>
           </div>
         </>

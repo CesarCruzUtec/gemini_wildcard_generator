@@ -6,6 +6,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { Theme } from '../../types';
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function ResetDbModal({ theme, show, generatedCount, savedCount, allTimeCost, onClose, onReset }: Props) {
+  const { t } = useTranslation();
   return (
     <AnimatePresence>
       {show && (
@@ -42,19 +44,19 @@ export function ResetDbModal({ theme, show, generatedCount, savedCount, allTimeC
                 <Trash2 className="w-4 h-4 text-red-500" />
               </div>
               <div>
-                <h2 className="text-sm font-bold">Reset Database</h2>
-                <p className="text-[10px] opacity-40 mt-0.5">This cannot be undone</p>
+                <h2 className="text-sm font-bold">{t('resetModal.title')}</h2>
+                <p className="text-[10px] opacity-40 mt-0.5">{t('resetModal.subtitle')}</p>
               </div>
             </div>
 
             <div className="p-6 space-y-3">
-              <p className="text-xs opacity-60 leading-relaxed">The following will be permanently deleted:</p>
+              <p className="text-xs opacity-60 leading-relaxed">{t('resetModal.description')}</p>
               <ul className="space-y-2">
                 {[
-                  { label: 'Generated wildcards', value: generatedCount },
-                  { label: 'Saved wildcards', value: savedCount },
-                  { label: 'All-time API cost', value: `$${allTimeCost.toFixed(6)}` },
-                  { label: 'API key & gallery path', value: 'cleared' },
+                  { label: t('resetModal.generatedWildcards'), value: generatedCount },
+                  { label: t('resetModal.savedWildcards'), value: savedCount },
+                  { label: t('resetModal.allTimeCost'), value: `$${allTimeCost.toFixed(6)}` },
+                  { label: t('resetModal.apiKeyGallery'), value: t('resetModal.cleared') },
                 ].map(({ label, value }) => (
                   <li
                     key={label}
@@ -74,13 +76,13 @@ export function ResetDbModal({ theme, show, generatedCount, savedCount, allTimeC
                 className="flex-1 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
                 style={{ backgroundColor: theme.input }}
               >
-                Cancel
+                {t('resetModal.cancel')}
               </button>
               <button
                 onClick={onReset}
                 className="flex-1 h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all bg-red-500 hover:bg-red-600 text-white"
               >
-                Reset Everything
+                {t('resetModal.resetEverything')}
               </button>
             </div>
           </motion.div>

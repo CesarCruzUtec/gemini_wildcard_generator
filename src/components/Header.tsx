@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Sparkles, Settings2, HelpCircle, KeyRound, FolderOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Theme } from '../types';
 import { THEMES } from '../constants';
 
@@ -29,6 +30,15 @@ export function Header({
   onToggleSettings,
   onShowGuide,
 }: Props) {
+  const { t, i18n } = useTranslation();
+  const LANGUAGES = [
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+  ];
+  const handleLanguageChange = (code: string) => {
+    i18n.changeLanguage(code);
+    localStorage.setItem('language', code);
+  };
   return (
     <header
       className="h-14 border-b flex items-center justify-between px-6 shrink-0 transition-colors duration-300"
@@ -37,7 +47,7 @@ export function Header({
       {/* Left: logo + warning badges */}
       <div className="flex items-center gap-2">
         <Sparkles className="w-4 h-4" style={{ color: theme.accent }} />
-        <h1 className="text-sm font-medium tracking-tight">Wildcard Studio</h1>
+        <h1 className="text-sm font-medium tracking-tight">{t('header.appName')}</h1>
 
         {!apiKey.trim() && (
           <button
@@ -49,7 +59,7 @@ export function Header({
               backgroundColor: 'rgba(250,100,100,0.08)',
             }}
           >
-            <KeyRound className="w-2.5 h-2.5" /> No API Key
+            <KeyRound className="w-2.5 h-2.5" /> {t('header.noApiKey')}
           </button>
         )}
 
@@ -63,15 +73,15 @@ export function Header({
               backgroundColor: 'rgba(230,190,0,0.08)',
             }}
           >
-            <FolderOpen className="w-2.5 h-2.5" /> No Gallery
+            <FolderOpen className="w-2.5 h-2.5" /> {t('header.noGallery')}
           </button>
         )}
       </div>
 
-      {/* Right: theme picker + guide + settings */}
+      {/* Right: theme picker + language picker + guide + settings */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Theme</label>
+          <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('header.theme')}</label>
           <select
             value={themeId}
             onChange={(e) => setThemeId(e.target.value)}
@@ -90,12 +100,28 @@ export function Header({
           </select>
         </div>
 
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('header.language')}</label>
+          <select
+            value={i18n.language}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            className="bg-transparent text-[10px] font-bold uppercase tracking-wider border-none focus:ring-0 cursor-pointer"
+            style={{ color: theme.accent }}
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code} style={{ backgroundColor: theme.card, color: theme.text }}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button
           onClick={onShowGuide}
           className="flex items-center gap-1.5 px-3 py-2 rounded-md transition-colors hover:bg-black/5 text-[10px] font-bold uppercase tracking-wider"
           style={{ color: theme.muted }}
         >
-          <HelpCircle className="w-4 h-4" /> Guide
+          <HelpCircle className="w-4 h-4" /> {t('header.guide')}
         </button>
 
         <button
@@ -106,7 +132,7 @@ export function Header({
             color: showSettings ? theme.accent : theme.muted,
           }}
         >
-          <Settings2 className="w-4 h-4" /> Settings
+          <Settings2 className="w-4 h-4" /> {t('header.settings')}
         </button>
       </div>
     </header>

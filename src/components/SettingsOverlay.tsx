@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { KeyRound, FolderOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Theme } from '../types';
 import { DEFAULT_SYSTEM_INSTRUCTION } from '../constants';
@@ -38,6 +39,7 @@ export function SettingsOverlay({
   onClose,
   onShowResetConfirm,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <AnimatePresence>
       {show && (
@@ -53,13 +55,13 @@ export function SettingsOverlay({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">
-                  System Instructions
+                  {t('settings.systemInstructions')}
                 </label>
                 <button
                   onClick={() => setSystemInstruction(DEFAULT_SYSTEM_INSTRUCTION)}
                   className="text-[10px] font-bold opacity-40 hover:opacity-100 transition-colors"
                 >
-                  Reset to Default
+                  {t('settings.resetToDefault')}
                 </button>
               </div>
               <textarea
@@ -78,7 +80,7 @@ export function SettingsOverlay({
             <div className="space-y-4">
               {/* API Key */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Gemini API Key</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('settings.apiKeyLabel')}</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30" />
@@ -86,7 +88,7 @@ export function SettingsOverlay({
                       type="password"
                       value={apiKeyInput}
                       onChange={(e) => setApiKeyInput(e.target.value)}
-                      placeholder="Enter your Gemini API key..."
+                      placeholder={t('settings.apiKeyPlaceholder')}
                       className="w-full h-10 border-none rounded-lg pl-8 pr-4 text-xs focus:ring-1 transition-all"
                       style={{
                         backgroundColor: theme.input,
@@ -100,17 +102,14 @@ export function SettingsOverlay({
                     className="h-10 px-4 rounded-lg text-xs font-bold transition-all shrink-0"
                     style={{ backgroundColor: theme.input, color: theme.accent }}
                   >
-                    Apply
+                    {t('settings.apply')}
                   </button>
                 </div>
-                <p className="text-[9px] opacity-30 leading-relaxed">
-                  Stored in the local database. Your key never leaves your machine.
-                </p>
               </div>
 
               {/* Gallery Path */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Gallery Folder</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">{t('settings.galleryFolderLabel')}</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30" />
@@ -119,7 +118,7 @@ export function SettingsOverlay({
                       value={galleryPathInput}
                       onChange={(e) => setGalleryPathInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                      placeholder="/path/to/ComfyUI/output"
+                      placeholder={t('settings.galleryPlaceholder')}
                       className="w-full h-10 border-none rounded-lg pl-8 pr-4 text-xs focus:ring-1 transition-all"
                       style={{
                         backgroundColor: theme.input,
@@ -133,12 +132,11 @@ export function SettingsOverlay({
                     className="h-10 px-4 rounded-lg text-xs font-bold transition-all shrink-0"
                     style={{ backgroundColor: theme.input, color: theme.accent }}
                   >
-                    Apply
+                    {t('settings.apply')}
                   </button>
                 </div>
                 <p className="text-[9px] opacity-30 leading-relaxed">
-                  Absolute path to your image output folder (e.g. ComfyUI output directory). Leave empty to
-                  disable the gallery.
+                  {t('settings.galleryNote')}
                 </p>
               </div>
 
@@ -149,13 +147,13 @@ export function SettingsOverlay({
                   className="w-full h-10 rounded-lg text-xs font-bold uppercase tracking-widest transition-all"
                   style={{ backgroundColor: theme.accent, color: theme.id === 'dark' ? '#000' : '#fff' }}
                 >
-                  Close Settings
+                  {t('settings.closeSettings')}
                 </button>
                 <button
                   onClick={onShowResetConfirm}
                   className="w-full h-9 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/30 text-red-500/60 hover:text-red-500 hover:border-red-500/60 hover:bg-red-500/5"
                 >
-                  Reset Database
+                  {t('settings.resetDatabase')}
                 </button>
               </div>
             </div>

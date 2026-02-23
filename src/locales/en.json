@@ -1,0 +1,129 @@
+{
+  "header": {
+    "appName": "Wildcard Studio",
+    "noApiKey": "No API Key",
+    "noGallery": "No Gallery",
+    "theme": "Theme",
+    "language": "Language",
+    "guide": "Guide",
+    "settings": "Settings"
+  },
+  "input": {
+    "requestLabel": "Request",
+    "requestPlaceholder": "e.g., cyberpunk street wear...",
+    "referenceImages": "Reference Images ({{count}}/4)",
+    "countLabel": "Count",
+    "generate": "Generate",
+    "surpriseMe": "Surprise Me"
+  },
+  "gallery": {
+    "title": "Output Gallery",
+    "refresh": "Refresh gallery",
+    "noFolder": "No gallery folder set",
+    "configureSettings": "Configure in Settings",
+    "noImages": "No images found",
+    "expand": "Click to expand",
+    "prev": "← Prev",
+    "next": "Next →"
+  },
+  "costs": {
+    "lastCall": "Last Call",
+    "thisSession": "This Session",
+    "allTime": "All Time"
+  },
+  "settings": {
+    "systemInstructions": "System Instructions",
+    "resetToDefault": "Reset to Default",
+    "apiKeyLabel": "Gemini API Key",
+    "apiKeyPlaceholder": "Enter your Gemini API key...",
+    "apply": "Apply",
+    "apiKeyNote": "Stored in the local database. Your key never leaves your machine.",
+    "galleryFolderLabel": "Gallery Folder",
+    "galleryPlaceholder": "/path/to/ComfyUI/output",
+    "galleryNote": "Absolute path to your image output folder (e.g. ComfyUI output directory). Leave empty to disable the gallery.",
+    "closeSettings": "Close Settings",
+    "resetDatabase": "Reset Database"
+  },
+  "card": {
+    "save": "Save",
+    "refine": "Refine",
+    "preview": "Preview",
+    "delete": "Delete"
+  },
+  "list": {
+    "generated": "Generated",
+    "saved": "Saved",
+    "clear": "Clear",
+    "deleteAll": "Delete all",
+    "cancel": "Cancel",
+    "deleteConfirm_one": "Delete <b>{{count}} wildcard</b> permanently?",
+    "deleteConfirm_other": "Delete <b>{{count}} wildcards</b> permanently?"
+  },
+  "search": {
+    "placeholder": "Search wildcards..."
+  },
+  "refineBar": {
+    "instruction": "Refining this wildcard — type your instructions in the sidebar and hit Generate"
+  },
+  "resetModal": {
+    "title": "Reset Database",
+    "subtitle": "This cannot be undone",
+    "description": "The following will be permanently deleted:",
+    "generatedWildcards": "Generated wildcards",
+    "savedWildcards": "Saved wildcards",
+    "allTimeCost": "All-time API cost",
+    "apiKeyGallery": "API key & gallery path",
+    "cleared": "cleared",
+    "cancel": "Cancel",
+    "resetEverything": "Reset Everything"
+  },
+  "guide": {
+    "title": "How to use Wildcard Studio",
+    "gotIt": "Got it",
+    "footer": "All data is stored locally — nothing is sent to the cloud except your prompts to the Gemini API.",
+    "step1": {
+      "title": "First-time setup",
+      "p1": "Click the <b>Settings</b> icon in the top-right corner.",
+      "p2": "Paste your <b>Gemini API Key</b> — this is required to generate wildcards. The key is saved locally in your database and never sent anywhere except the Gemini API itself.",
+      "p3": "Optionally set a <b>Gallery Folder</b> — point it to any folder of images on your computer (e.g. your ComfyUI output folder). This enables the image gallery in the sidebar. Leave it blank if you don't need image previews.",
+      "p4": "A warning badge in the header reminds you if the API key is missing."
+    },
+    "step2": {
+      "title": "Generate wildcards",
+      "p1": "Type a description in the <b>Request</b> box on the left sidebar — for example: <i>\"cinematic lighting styles\"</i> or <i>\"fantasy creature adjectives\"</i>.",
+      "p2": "Optionally upload up to <b>4 reference images</b> to visually guide the AI (drag & drop or click the image area).",
+      "p3": "Set the <b>Count</b> field for how many wildcards to generate, then hit <b>Generate</b>.",
+      "p4": "The <b>Surprise Me</b> button clears your prompt and generates a random batch — great for inspiration.",
+      "p5": "New wildcards appear at the top of the <b>Generated</b> column on the right, highlighted briefly so you can spot them.",
+      "note": "<b>Note:</b> By default the AI is instructed to generate <b>clothing & pose</b> wildcards. If you want to generate something else, open Settings and edit the <b>System Instruction</b> to describe what kind of wildcards you need."
+    },
+    "step3": {
+      "title": "Refine a wildcard",
+      "p1": "Click <b>Refine</b> on any wildcard card. A bar appears at the bottom of the screen showing the selected wildcard as the base.",
+      "p2": "Type refinement instructions in the <b>Request</b> box (e.g. <i>\"make it more dramatic\"</i>) and click <b>Generate</b>. The AI will produce variations based on that specific wildcard.",
+      "p3": "Click the <b>×</b> on the refine bar to cancel and go back to normal generation."
+    },
+    "step4": {
+      "title": "Copy & save",
+      "p1": "<b>Click anywhere on the text</b> of a wildcard card to instantly copy it to your clipboard. A brief confirmation flashes on the card.",
+      "p2": "Click <b>Save</b> on a Generated card to move it into your permanent <b>Saved</b> list. Saved wildcards persist across sessions and won't be lost when you clear Generated.",
+      "p3": "Use the <b>Delete</b> button to remove a single card, or the <b>Clear</b> button in the column header to delete all at once (a confirmation step prevents accidents)."
+    },
+    "step5": {
+      "title": "Search",
+      "p1": "Use the <b>Search bar</b> at the top of the main area to filter both columns simultaneously. Results update as you type. Both Generated and Saved wildcards are searched in the database — not just what's currently loaded.",
+      "p2": "Clear the search box to see all wildcards again."
+    },
+    "step6": {
+      "title": "Gallery & image previews",
+      "p1": "If a gallery folder is configured, a panel in the left sidebar shows all images in that folder. Use the <b>arrows</b> to browse or click the <b>refresh</b> icon after adding new images.",
+      "p2": "Navigate to an image you want to associate with a wildcard, then click <b>Preview</b> on that card. A thumbnail will appear on the right side of the card.",
+      "p3": "Hover over a card that has a preview — the full image appears as a blurred overlay on the opposite column so it doesn't cover the card you're looking at.",
+      "p4": "Click the <b>×</b> button on a thumbnail to remove the preview link from that card."
+    },
+    "step7": {
+      "title": "Gallery lightbox",
+      "p1": "Click any image in the sidebar gallery to open it fullscreen. Navigate between images using the <b>← →</b> arrow buttons, your <b>keyboard arrow keys</b>, or <b>scroll wheel</b>. Images slide in with a Tinder-style animation. Click outside the image or press <b>Esc</b> to close."
+    }
+  }
+}

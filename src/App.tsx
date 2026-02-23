@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { useTranslation } from 'react-i18next';
 import { Theme, WildcardItem } from './types';
 import { THEMES, DEFAULT_SYSTEM_INSTRUCTION } from './constants';
 import { dbApi } from './api/dbApi';
@@ -21,6 +22,7 @@ import { RefineBar } from './components/RefineBar';
 import { WildcardsColumns } from './components/WildcardsColumns';
 
 export default function App() {
+  const { t } = useTranslation();
   // ── Persisted in localStorage ────────────────────────────────────────────
   const [themeId, setThemeId] = useLocalStorage('themeId', 'dark');
   const [systemInstruction, setSystemInstruction] = useLocalStorage('systemInstruction', DEFAULT_SYSTEM_INSTRUCTION);
@@ -410,7 +412,7 @@ export default function App() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search wildcards..."
+              placeholder={t('search.placeholder')}
               className="flex-1 bg-transparent border-none text-sm focus:ring-0 placeholder:opacity-20"
             />
           </div>

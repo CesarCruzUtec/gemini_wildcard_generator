@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Theme, WildcardItem } from '../types';
 import { WildcardListHandle } from '../hooks/useWildcardList';
 import { WildcardList } from './WildcardList';
@@ -65,6 +66,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
 }: Props) {
   // ── Hover preview state lives here — changes don't bubble up to App ──────
   const [previewHover, setPreviewHover] = useState<{ url: string; side: 'left' | 'right' } | null>(null);
+  const { t } = useTranslation();
 
   const handleHoverChange = useCallback((url: string | null, side: 'left' | 'right' = 'right') => {
     setPreviewHover(url ? { url, side } : null);
@@ -103,7 +105,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
         <ColumnPreviewOverlay url={previewHover?.side === 'left' ? previewHover.url : null} />
         <WildcardList
           theme={theme}
-          title="Generated"
+          title={t('list.generated')}
           items={generatedList.items}
           total={generatedList.total}
           isLoadingMore={generatedList.isLoadingMore}
@@ -136,7 +138,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
         <ColumnPreviewOverlay url={previewHover?.side === 'right' ? previewHover.url : null} />
         <WildcardList
           theme={theme}
-          title="Saved"
+          title={t('list.saved')}
           items={savedList.items}
           total={savedList.total}
           isLoadingMore={savedList.isLoadingMore}

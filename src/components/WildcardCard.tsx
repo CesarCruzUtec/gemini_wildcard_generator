@@ -6,6 +6,7 @@
 import React from 'react';
 import { Save, Sparkles, Image as ImageIcon, Trash2, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { Theme, WildcardItem } from '../types';
 import { cn } from '../utils/cn';
 
@@ -47,6 +48,7 @@ export const WildcardCard = React.memo(function WildcardCard({
   onHoverChange,
   previewSide = 'right',
 }: Props) {
+  const { t } = useTranslation();
   const isCopied = copiedId === item.id;
   const hasPreview = Boolean(item.previewUrl);
 
@@ -87,7 +89,7 @@ export const WildcardCard = React.memo(function WildcardCard({
               className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors"
               style={{ backgroundColor: theme.input, borderColor: theme.border }}
             >
-              <Save className="w-3 h-3" /> Save
+              <Save className="w-3 h-3" /> {t('card.save')}
             </button>
           )}
           <button
@@ -95,7 +97,7 @@ export const WildcardCard = React.memo(function WildcardCard({
             className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors"
             style={{ backgroundColor: theme.input, borderColor: theme.border }}
           >
-            <Sparkles className="w-3 h-3" /> Refine
+            <Sparkles className="w-3 h-3" /> {t('card.refine')}
           </button>
           <button
             onClick={onSetPreview}
@@ -107,14 +109,14 @@ export const WildcardCard = React.memo(function WildcardCard({
               color: hasPreview ? (theme.id === 'dark' ? '#000' : '#fff') : undefined,
             }}
           >
-            <ImageIcon className="w-3 h-3" /> Preview
+            <ImageIcon className="w-3 h-3" /> {t('card.preview')}
           </button>
           <button
             onClick={onRemove}
             className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors hover:text-red-500"
             style={{ backgroundColor: theme.input, borderColor: theme.border }}
           >
-            <Trash2 className="w-3 h-3" /> Delete
+            <Trash2 className="w-3 h-3" /> {t('card.delete')}
           </button>
         </div>
       </div>

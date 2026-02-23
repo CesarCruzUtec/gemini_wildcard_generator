@@ -6,6 +6,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Theme, WildcardItem } from '../types';
 import { WildcardCard } from './WildcardCard';
@@ -70,6 +71,7 @@ export const WildcardList = React.memo(function WildcardList({
   onHoverChange,
   previewSide = 'right',
 }: Props) {
+  const { t } = useTranslation();
   const safeItems = items ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -114,7 +116,7 @@ export const WildcardList = React.memo(function WildcardList({
               disabled={total === 0}
               className="flex items-center gap-1.5 px-2 py-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] font-medium"
             >
-              <Trash2 className="w-3 h-3" /> Clear
+              <Trash2 className="w-3 h-3" /> {t('list.clear')}
             </button>
           </div>
         </div>
@@ -133,11 +135,11 @@ export const WildcardList = React.memo(function WildcardList({
                 style={{ borderColor: theme.border }}
               >
                 <p className="text-[10px] opacity-60 leading-tight">
-                  Delete{' '}
-                  <span className="font-bold text-red-500">
-                    {total} wildcard{total !== 1 ? 's' : ''}
-                  </span>{' '}
-                  permanently?
+                  <Trans
+                    i18nKey="list.deleteConfirm"
+                    count={total}
+                    components={{ b: <span className="font-bold text-red-500" /> }}
+                  />
                 </p>
                 <div className="flex gap-2 shrink-0">
                   <button
@@ -145,13 +147,13 @@ export const WildcardList = React.memo(function WildcardList({
                     className="px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors"
                     style={{ backgroundColor: theme.input }}
                   >
-                    Cancel
+                    {t('list.cancel')}
                   </button>
                   <button
                     onClick={onClear}
                     className="px-2.5 py-1 rounded-md text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
                   >
-                    Delete all
+                    {t('list.deleteAll')}
                   </button>
                 </div>
               </div>
