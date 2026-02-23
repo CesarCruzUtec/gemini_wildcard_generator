@@ -1,5 +1,9 @@
 /**
- * Gallery + Wildcards + Costs Server
+ * Gallery + Wildcards + Costs + Config Server
+ *
+ * Config (SQLite):
+ *   GET   /api/config               → { galleryDir, apiKey }
+ *   PATCH /api/config               → { galleryDir?, apiKey? }
  *
  * Gallery:
  *   GET  /api/gallery              → JSON list of image filenames, newest first

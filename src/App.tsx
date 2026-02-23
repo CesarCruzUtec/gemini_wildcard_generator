@@ -22,7 +22,8 @@ import {
   Image as ImageIcon,
   Search,
   ArrowRight,
-  FolderOpen
+  FolderOpen,
+  KeyRound
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -105,15 +106,15 @@ const dbApi = {
       body: JSON.stringify({ delta }),
     }),
   // ── Config ──────────────────────────────────────────────────────────────────
-  fetchConfig: async (): Promise<{ galleryDir: string }> => {
+  fetchConfig: async (): Promise<{ galleryDir: string; apiKey: string }> => {
     const res = await fetch('/api/config');
     return res.json();
   },
-  updateConfig: (galleryDir: string) =>
+  updateConfig: (config: { galleryDir?: string; apiKey?: string }) =>
     fetch('/api/config', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ galleryDir }),
+      body: JSON.stringify(config),
     }),
 };
 
@@ -229,7 +230,6 @@ export default function App() {
   const [systemInstruction, setSystemInstruction] = useLocalStorage('systemInstruction', DEFAULT_SYSTEM_INSTRUCTION);
   const [userPrompt, setUserPrompt] = useLocalStorage('userPrompt', '');
   const [numToGenerate, setNumToGenerate] = useLocalStorage('numToGenerate', 5);
-  const [customApiKey, setCustomApiKey] = useLocalStorage('customApiKey', '');
   const [referenceImages, setReferenceImages] = useLocalStorage<string[]>('referenceImages', []);
 
   const theme = THEMES.find(t => t.id === themeId) ?? THEMES[1];
@@ -247,6 +247,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [refiningWildcard, setRefiningWildcard] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const [galleryPath, setGalleryPath] = useState('');
   const [galleryPathInput, setGalleryPathInput] = useState('');
   const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
@@ -280,7 +282,10 @@ export default function App() {
       .then(({ total }) => setAllTimeCost(total))
       .catch(() => {});
     dbApi.fetchConfig()
-      .then(({ galleryDir }) => { setGalleryPath(galleryDir); setGalleryPathInput(galleryDir); })
+      .then(({ galleryDir, apiKey: key }) => {
+        setGalleryPath(galleryDir); setGalleryPathInput(galleryDir);
+        setApiKey(key); setApiKeyInput(key);
+      })
       .catch(() => {});
   }, []);
 
@@ -309,9 +314,12 @@ export default function App() {
 
   const galleryEnabled = galleryPath.trim() !== '';
 
-  // Sync settings input field whenever settings panel opens
+  // Sync settings input fields whenever settings panel opens
   useEffect(() => {
-    if (showSettings) setGalleryPathInput(galleryPath);
+    if (showSettings) {
+      setGalleryPathInput(galleryPath);
+      setApiKeyInput(apiKey);
+    }
   }, [showSettings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resizeImage = (base64Str: string): Promise<string> => {
@@ -366,9 +374,9 @@ export default function App() {
     setLastGenerationTime(generationTime);
 
     try {
-      const keyToUse = customApiKey || process.env.GEMINI_API_KEY;
+      const keyToUse = apiKey.trim();
       if (!keyToUse) {
-        alert("Please provide a Gemini API Key in settings.");
+        alert("Please set a Gemini API Key in Settings.");
         setShowSettings(true);
         setIsLoading(false);
         return;
@@ -566,6 +574,24 @@ export default function App() {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4" style={{ color: theme.accent }} />
           <h1 className="text-sm font-medium tracking-tight">Wildcard Studio</h1>
+          {!apiKey.trim() && (
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border transition-opacity hover:opacity-80"
+              style={{ borderColor: 'rgba(250,100,100,0.5)', color: 'rgb(220,80,80)', backgroundColor: 'rgba(250,100,100,0.08)' }}
+            >
+              <KeyRound className="w-2.5 h-2.5" /> No API Key
+            </button>
+          )}
+          {!galleryEnabled && (
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border transition-opacity hover:opacity-80"
+              style={{ borderColor: 'rgba(200,160,0,0.5)', color: 'rgb(180,140,0)', backgroundColor: 'rgba(230,190,0,0.08)' }}
+            >
+              <FolderOpen className="w-2.5 h-2.5" /> No Gallery
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -583,21 +609,20 @@ export default function App() {
           </div>
           <button
             onClick={() => setShowGuide(true)}
-            className="p-2 rounded-md transition-colors hover:bg-black/5"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md transition-colors hover:bg-black/5 text-[10px] font-bold uppercase tracking-wider"
             style={{ color: theme.muted }}
-            title="How to use"
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-4 h-4" /> Guide
           </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="p-2 rounded-md transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md transition-colors text-[10px] font-bold uppercase tracking-wider"
             style={{
               backgroundColor: showSettings ? theme.input : 'transparent',
               color: showSettings ? theme.accent : theme.muted
             }}
           >
-            <Settings2 className="w-4 h-4" />
+            <Settings2 className="w-4 h-4" /> Settings
           </button>
         </div>
       </header>
@@ -632,37 +657,51 @@ export default function App() {
 
               <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
                 <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">0. First-time setup</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    Open <Settings2 className="w-3 h-3 inline" /> <span className="font-bold">Settings</span> and enter your <span className="font-bold">Gemini API Key</span> — the key is saved in the local database and never leaves your machine. Optionally set a <span className="font-bold">Gallery Folder</span> (e.g. your ComfyUI output path) to enable the image gallery. Warning badges in the header will remind you if either is missing.
+                  </p>
+                </section>
+
+                <section className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">1. Generate</h3>
                   <p className="text-sm leading-relaxed opacity-70">
-                    Enter a prompt in the <span className="font-bold">Request</span> box. You can also upload up to <span className="font-bold">4 reference images</span> to guide the generation. Set the <span className="font-bold">Count</span> and hit <span className="font-bold">Generate</span>.
+                    Enter a prompt in the <span className="font-bold">Request</span> box. Upload up to <span className="font-bold">4 reference images</span> to guide the generation. Set the <span className="font-bold">Count</span> and hit <span className="font-bold">Generate</span>. Use the <RefreshCw className="w-3 h-3 inline" /> button to generate a random surprise prompt.
                   </p>
                 </section>
 
                 <section className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">2. Refine</h3>
                   <p className="text-sm leading-relaxed opacity-70">
-                    Found a wildcard you like? Click the <Sparkles className="w-3 h-3 inline" /> <span className="font-bold">Refine</span> button. The card will appear in the sidebar as a reference, allowing you to provide specific refinement instructions.
+                    Hover over any wildcard and click <span className="font-bold">Refine</span>. A bar will appear at the bottom of the screen showing the selected wildcard. Type your refinement instructions in the <span className="font-bold">Request</span> sidebar and hit <span className="font-bold">Generate</span> — the selected wildcard is used as the base for the new generation. Click <X className="w-3 h-3 inline" /> on the bar to cancel.
                   </p>
                 </section>
 
                 <section className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">3. Organize & Search</h3>
                   <p className="text-sm leading-relaxed opacity-70">
-                    The app is split into <span className="font-bold">Generated</span> and <span className="font-bold">Saved</span> grids. Use the <span className="font-bold">Search Bar</span> at the top to filter both sections simultaneously. You can also <span className="font-bold">drag and drop</span> cards to reorder them.
+                    The app is split into <span className="font-bold">Generated</span> and <span className="font-bold">Saved</span> columns. Use the <span className="font-bold">Search Bar</span> at the top to filter both simultaneously. <span className="font-bold">Drag and drop</span> cards to reorder them within each column.
                   </p>
                 </section>
 
                 <section className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">4. Save & Export</h3>
                   <p className="text-sm leading-relaxed opacity-70">
-                    Click the <Save className="w-3 h-3 inline" /> <span className="font-bold">Save</span> button to move a wildcard to your permanent list. Use the <Upload className="w-3 h-3 inline" /> <span className="font-bold">Import</span> or <Download className="w-3 h-3 inline" /> <span className="font-bold">Export</span> buttons to manage your <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-xs">.txt</code> files.
+                    Click <Save className="w-3 h-3 inline" /> <span className="font-bold">Save</span> on a generated card to move it to your permanent list. Use <Upload className="w-3 h-3 inline" /> <span className="font-bold">Import</span> or <Download className="w-3 h-3 inline" /> <span className="font-bold">Export</span> in the Saved header to manage <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-xs">.txt</code> files.
                   </p>
                 </section>
 
                 <section className="space-y-2">
-                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">5. Cost & Themes</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">5. Gallery & Previews</h3>
                   <p className="text-sm leading-relaxed opacity-70">
-                    Monitor API usage at the bottom of the sidebar. Switch between various <span className="font-bold">Themes</span> in the header to find your preferred aesthetic.
+                    If a gallery folder is set, browse your output images in the left sidebar. Hover over a card in the gallery then click <ImageIcon className="w-3 h-3 inline" /> <span className="font-bold">Preview</span> on a wildcard to link that image to it — a thumbnail appears in the corner of the card and a larger preview pops up on hover.
+                  </p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">6. Costs & Themes</h3>
+                  <p className="text-sm leading-relaxed opacity-70">
+                    API usage is tracked at the bottom of the sidebar (last call, session total, all-time). Switch <span className="font-bold">Themes</span> from the header dropdown.
                   </p>
                 </section>
               </div>
@@ -717,31 +756,36 @@ export default function App() {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Gemini API Key</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={customApiKey}
-                      onChange={(e) => setCustomApiKey(e.target.value)}
-                      placeholder={process.env.GEMINI_API_KEY ? "Using environment key (••••••••)" : "Enter your API key..."}
-                      className="w-full h-10 border-none rounded-lg px-4 text-xs focus:ring-1 transition-all pr-10"
-                      style={{
-                        backgroundColor: theme.input,
-                        color: theme.text,
-                        '--tw-ring-color': theme.accent
-                      } as any}
-                    />
-                    {customApiKey && (
-                      <button
-                        onClick={() => setCustomApiKey('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30" />
+                      <input
+                        type="password"
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Enter your Gemini API key..."
+                        className="w-full h-10 border-none rounded-lg pl-8 pr-4 text-xs focus:ring-1 transition-all"
+                        style={{
+                          backgroundColor: theme.input,
+                          color: theme.text,
+                          '--tw-ring-color': theme.accent
+                        } as any}
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const trimmed = apiKeyInput.trim();
+                        setApiKey(trimmed);
+                        await dbApi.updateConfig({ apiKey: trimmed });
+                      }}
+                      className="h-10 px-4 rounded-lg text-xs font-bold transition-all shrink-0"
+                      style={{ backgroundColor: theme.input, color: theme.accent }}
+                    >
+                      Apply
+                    </button>
                   </div>
                   <p className="text-[9px] opacity-30 leading-relaxed">
-                    Your API key is stored only in your browser's memory for this session.
-                    If left empty, the app will attempt to use the system default key.
+                    Stored in the local database. Your key never leaves your machine.
                   </p>
                 </div>
 
@@ -768,7 +812,7 @@ export default function App() {
                       onClick={async () => {
                         const trimmed = galleryPathInput.trim();
                         setGalleryPath(trimmed);
-                        await dbApi.updateConfig(trimmed);
+                        await dbApi.updateConfig({ galleryDir: trimmed });
                         if (trimmed) {
                           setGalleryLoading(true);
                           try {
@@ -817,28 +861,6 @@ export default function App() {
         >
           {/* Input Section */}
           <div className="p-6 space-y-4 border-b overflow-y-auto custom-scrollbar" style={{ borderColor: theme.border }}>
-            {refiningWildcard && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Refining Card</label>
-                  <button
-                    onClick={() => setRefiningWildcard(null)}
-                    className="text-[10px] font-bold text-red-500 opacity-60 hover:opacity-100 transition-opacity"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div
-                  className="p-3 rounded-xl border text-[11px] font-mono leading-relaxed shadow-sm"
-                  style={{ backgroundColor: theme.card, borderColor: theme.accent }}
-                >
-                  <div className="opacity-70 whitespace-pre-wrap break-words">
-                    {refiningWildcard}
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider opacity-40">Request</label>
               <textarea
@@ -1055,9 +1077,9 @@ export default function App() {
                 <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Generated ({filteredGenerated.length})</h2>
                 <button
                   onClick={() => clearGenerated()}
-                  className="p-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100"
+                  className="flex items-center gap-1.5 px-2 py-1 hover:bg-black/5 rounded-md transition-colors opacity-40 hover:opacity-100 text-[10px] font-medium"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3 h-3" /> Clear
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
@@ -1111,36 +1133,32 @@ export default function App() {
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button
                             onClick={(e) => { e.stopPropagation(); saveToSavedList(item); }}
-                            className="p-1.5 border rounded-md transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
-                            title="Save"
                           >
-                            <Save className="w-3 h-3" />
+                            <Save className="w-3 h-3" /> Save
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
-                            className="p-1.5 border rounded-md transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
-                            title="Refine"
                           >
-                            <Sparkles className="w-3 h-3" />
+                            <Sparkles className="w-3 h-3" /> Refine
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPreviewForWildcard(item.id, `/gallery-images/${galleryFiles[galleryIndex]}`, 'generated'); }}
                             disabled={!galleryEnabled || galleryFiles.length === 0}
-                            className="p-1.5 border rounded-md transition-all shadow-sm disabled:opacity-20"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium disabled:opacity-20"
                             style={{ backgroundColor: item.previewUrl ? theme.accent : theme.card, borderColor: item.previewUrl ? theme.accent : theme.border, color: item.previewUrl ? (theme.id === 'dark' ? '#000' : '#fff') : undefined }}
-                            title="Set current gallery image as preview"
                           >
-                            <ImageIcon className="w-3 h-3" />
+                            <ImageIcon className="w-3 h-3" /> Preview
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); removeGenerated(item.id); }}
-                            className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium hover:text-red-500"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
-                            title="Delete"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3 h-3" /> Delete
                           </button>
                         </div>
                         <AnimatePresence>
@@ -1170,15 +1188,15 @@ export default function App() {
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.border }}>
                 <h2 className="text-[10px] font-bold uppercase tracking-wider opacity-40">Saved ({filteredSaved.length})</h2>
-                <div className="flex gap-2">
-                  <button onClick={() => fileInputRef.current?.click()} className="p-1 opacity-40 hover:opacity-100" title="Import">
-                    <Upload className="w-3 h-3" />
+                <div className="flex gap-1">
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-2 py-1 opacity-40 hover:opacity-100 rounded-md hover:bg-black/5 transition-colors text-[10px] font-medium">
+                    <Upload className="w-3 h-3" /> Import
                   </button>
-                  <button onClick={downloadWildcards} className="p-1 opacity-40 hover:opacity-100" title="Export">
-                    <Download className="w-3 h-3" />
+                  <button onClick={downloadWildcards} className="flex items-center gap-1.5 px-2 py-1 opacity-40 hover:opacity-100 rounded-md hover:bg-black/5 transition-colors text-[10px] font-medium">
+                    <Download className="w-3 h-3" /> Export
                   </button>
-                  <button onClick={clearSaved} className="p-1 opacity-40 hover:opacity-100 hover:text-red-500" title="Clear All">
-                    <Trash2 className="w-3 h-3" />
+                  <button onClick={clearSaved} className="flex items-center gap-1.5 px-2 py-1 opacity-40 hover:opacity-100 hover:text-red-500 rounded-md hover:bg-black/5 transition-colors text-[10px] font-medium">
+                    <Trash2 className="w-3 h-3" /> Clear
                   </button>
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt" />
                 </div>
@@ -1227,28 +1245,25 @@ export default function App() {
                         <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <button
                             onClick={(e) => { e.stopPropagation(); handleRefine(item.text); }}
-                            className="p-1.5 border rounded-md transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
-                            title="Refine"
                           >
-                            <Sparkles className="w-3 h-3" />
+                            <Sparkles className="w-3 h-3" /> Refine
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPreviewForWildcard(item.id, `/gallery-images/${galleryFiles[galleryIndex]}`, 'saved'); }}
                             disabled={!galleryEnabled || galleryFiles.length === 0}
-                            className="p-1.5 border rounded-md transition-all shadow-sm disabled:opacity-20"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium disabled:opacity-20"
                             style={{ backgroundColor: item.previewUrl ? theme.accent : theme.card, borderColor: item.previewUrl ? theme.accent : theme.border, color: item.previewUrl ? (theme.id === 'dark' ? '#000' : '#fff') : undefined }}
-                            title="Set current gallery image as preview"
                           >
-                            <ImageIcon className="w-3 h-3" />
+                            <ImageIcon className="w-3 h-3" /> Preview
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); removeSaved(item.id); }}
-                            className="p-1.5 border rounded-md transition-all shadow-sm hover:text-red-500"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-all shadow-sm text-[10px] font-medium hover:text-red-500"
                             style={{ backgroundColor: theme.card, borderColor: theme.border }}
-                            title="Delete"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3 h-3" /> Delete
                           </button>
                         </div>
                         <AnimatePresence>
@@ -1276,6 +1291,44 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Bottom Refine Bar */}
+      <AnimatePresence>
+        {refiningWildcard && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-6 pb-4 pointer-events-none"
+          >
+            <div
+              className="max-w-2xl w-full rounded-2xl shadow-2xl border-2 pointer-events-auto"
+              style={{ backgroundColor: theme.card, borderColor: theme.accent + '60' }}
+            >
+              <div className="flex items-start gap-4 p-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-3 h-3 shrink-0" style={{ color: theme.accent }} />
+                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">Refining this wildcard — type your instructions in the sidebar and hit Generate</span>
+                  </div>
+                  <p className="text-sm font-mono leading-relaxed opacity-70 whitespace-pre-wrap break-words line-clamp-3">
+                    {refiningWildcard}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setRefiningWildcard(null)}
+                  className="shrink-0 p-1.5 rounded-lg transition-colors opacity-40 hover:opacity-100"
+                  style={{ backgroundColor: theme.input }}
+                  title="Clear refine selection"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating preview on wildcard hover */}
       {previewHover && (
