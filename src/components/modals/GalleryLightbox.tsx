@@ -29,8 +29,17 @@ export function GalleryLightbox({ theme, files, index, onClose, onNavigate }: Pr
       if (e.key === 'ArrowLeft') prev();
       if (e.key === 'ArrowRight') next();
     };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY > 0) next();
+      else prev();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('wheel', onWheel);
+    };
   }, [onClose, prev, next]);
 
   return (
