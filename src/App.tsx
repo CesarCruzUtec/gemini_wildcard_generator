@@ -19,7 +19,7 @@ import { GuideModal } from './components/modals/GuideModal';
 import { Sidebar } from './components/Sidebar';
 import { WildcardList } from './components/WildcardList';
 import { RefineBar } from './components/RefineBar';
-import { PreviewHover } from './components/PreviewHover';
+import { ColumnPreviewOverlay } from './components/ColumnPreviewOverlay';
 
 export default function App() {
   // ── Persisted in localStorage ────────────────────────────────────────────
@@ -52,7 +52,7 @@ export default function App() {
   const [galleryFiles, setGalleryFiles] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryLoading, setGalleryLoading] = useState(true);
-  const [previewHover, setPreviewHover] = useState<{ url: string; x: number; y: number; side: 'left' | 'right' } | null>(null);
+  const [previewHover, setPreviewHover] = useState<{ url: string; side: 'left' | 'right' } | null>(null);
   const [clearGeneratedConfirm, setClearGeneratedConfirm] = useState(false);
   const [clearSavedConfirm, setClearSavedConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -252,8 +252,8 @@ export default function App() {
     setClearGeneratedConfirm(false);
   };
 
-  const handleHoverChange = (url: string | null, x?: number, y?: number, side: 'left' | 'right' = 'right') => {
-    setPreviewHover(url && x !== undefined && y !== undefined ? { url, x, y, side } : null);
+  const handleHoverChange = (url: string | null, side: 'left' | 'right' = 'right') => {
+    setPreviewHover(url ? { url, side } : null);
   };
 
   // ── Settings handlers ────────────────────────────────────────────────────
@@ -420,7 +420,9 @@ export default function App() {
 
           {/* Generated + Saved columns */}
           <div className="flex-1 flex overflow-hidden">
-            <div className="flex-1 border-r overflow-hidden flex flex-col" style={{ borderColor: theme.border }}>
+            <div className="relative flex-1 border-r overflow-hidden flex flex-col" style={{ borderColor: theme.border }}>
+              {/* Overlay when a Saved card is hovered — shows preview in Generated column */}
+              <ColumnPreviewOverlay url={previewHover?.side === 'left' ? previewHover.url : null} />
               <WildcardList
                 theme={theme}
                 title="Generated"
@@ -450,7 +452,9 @@ export default function App() {
               />
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="relative flex-1 overflow-hidden flex flex-col">
+              {/* Overlay when a Generated card is hovered — shows preview in Saved column */}
+              <ColumnPreviewOverlay url={previewHover?.side === 'right' ? previewHover.url : null} />
               <WildcardList
                 theme={theme}
                 title="Saved"
@@ -486,8 +490,6 @@ export default function App() {
         refiningWildcard={refiningWildcard}
         onClear={() => setRefiningWildcard(null)}
       />
-      <PreviewHover theme={theme} previewHover={previewHover} />
-
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

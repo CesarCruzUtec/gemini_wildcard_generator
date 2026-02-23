@@ -25,7 +25,7 @@ interface Props {
   onSetPreview: () => void;
   onRemovePreview: () => void;
   onRemove: () => void;
-  onHoverChange: (url: string | null, x?: number, y?: number, side?: 'left' | 'right') => void;
+  onHoverChange: (url: string | null, side?: 'left' | 'right') => void;
   /** Which side of the card to show the preview popup. Default: 'right' */
   previewSide?: 'left' | 'right';
 }
@@ -61,12 +61,8 @@ export function WildcardCard({
         borderColor: isHighlighted ? theme.accent : theme.border,
         '--tw-ring-color': theme.accent,
       } as React.CSSProperties}
-      onMouseEnter={(e) => {
-        if (item.previewUrl) {
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          const anchorX = previewSide === 'right' ? rect.right : rect.left;
-          onHoverChange(item.previewUrl, anchorX, rect.top, previewSide);
-        }
+      onMouseEnter={() => {
+        if (item.previewUrl) onHoverChange(item.previewUrl, previewSide);
       }}
       onMouseLeave={() => onHoverChange(null)}
     >

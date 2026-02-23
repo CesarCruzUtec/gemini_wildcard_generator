@@ -39,7 +39,7 @@ interface Props {
   onSetPreview: (id: string, url: string) => void;
   onRemovePreview: (id: string) => void;
   onRemove: (id: string) => void;
-  onHoverChange: (url: string | null, x?: number, y?: number, side?: 'left' | 'right') => void;
+  onHoverChange: (url: string | null, side?: 'left' | 'right') => void;
   previewSide?: 'left' | 'right';
 }
 
