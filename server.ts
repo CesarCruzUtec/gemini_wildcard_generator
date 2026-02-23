@@ -1,5 +1,5 @@
 /**
- * Gallery + Wildcards Server
+ * Gallery + Wildcards + Costs Server
  *
  * Gallery:
  *   GET  /api/gallery              → JSON list of image filenames, newest first
@@ -12,6 +12,12 @@
  *   DELETE /api/wildcards/:id                    → delete one
  *   DELETE /api/wildcards?list=generated|saved   → clear a list
  *   POST   /api/wildcards/reorder                → { list, ids[] } sets positions
+ *
+ * Costs (SQLite):
+ *   GET   /api/costs                → { total: number, sessions: Session[] }
+ *   POST  /api/costs/session        → create session row → { id }
+ *   PATCH /api/costs/session/:id    → { amount } update running session total
+ *   PATCH /api/costs/total          → { delta } add to all-time total
  */
 
 import express from 'express';
@@ -37,7 +43,20 @@ db.exec(`
     position    REAL NOT NULL DEFAULT 0,
     created_at  INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS costs (
+    id         TEXT PRIMARY KEY,
+    type       TEXT NOT NULL CHECK(type IN ('session', 'total')),
+    label      TEXT,
+    amount     REAL NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
 `);
+
+// Ensure the persistent all-time total row exists
+db.prepare(`
+  INSERT OR IGNORE INTO costs (id, type, label, amount, created_at)
+  VALUES ('__total__', 'total', 'All-Time Total', 0, ?)
+`).run(Date.now());
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.use((_req, res, next) => {
@@ -133,6 +152,37 @@ app.post('/api/wildcards/reorder', (req, res) => {
   const { list, ids } = req.body as { list: string; ids: string[] };
   const stmt = db.prepare('UPDATE wildcards SET position = ? WHERE id = ? AND list = ?');
   db.transaction(() => { ids.forEach((id, i) => stmt.run(i, id, list)); })();
+  res.json({ ok: true });
+});
+
+// ── GET /api/costs ────────────────────────────────────────────────────────────
+app.get('/api/costs', (_req, res) => {
+  const total = (db.prepare(`SELECT amount FROM costs WHERE id = '__total__'`).get() as any)?.amount ?? 0;
+  const sessions = db.prepare(`SELECT * FROM costs WHERE type = 'session' ORDER BY created_at DESC LIMIT 50`).all();
+  res.json({ total, sessions });
+});
+
+// ── POST /api/costs/session ───────────────────────────────────────────────────
+app.post('/api/costs/session', (req, res) => {
+  const { label } = req.body as { label: string };
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  db.prepare(`INSERT INTO costs (id, type, label, amount, created_at) VALUES (?, 'session', ?, 0, ?)`)
+    .run(id, label, now);
+  res.json({ id });
+});
+
+// ── PATCH /api/costs/session/:id ─────────────────────────────────────────────
+app.patch('/api/costs/session/:id', (req, res) => {
+  const { amount } = req.body as { amount: number };
+  db.prepare(`UPDATE costs SET amount = ? WHERE id = ? AND type = 'session'`).run(amount, req.params.id);
+  res.json({ ok: true });
+});
+
+// ── PATCH /api/costs/total ────────────────────────────────────────────────────
+app.patch('/api/costs/total', (req, res) => {
+  const { delta } = req.body as { delta: number };
+  db.prepare(`UPDATE costs SET amount = amount + ? WHERE id = '__total__'`).run(delta);
   res.json({ ok: true });
 });
 

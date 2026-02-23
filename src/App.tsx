@@ -77,6 +77,32 @@ const dbApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ list, ids }),
     }),
+  // ── Costs ──────────────────────────────────────────────────────────────
+  fetchCosts: async (): Promise<{ total: number }> => {
+    const res = await fetch('/api/costs');
+    return res.json();
+  },
+  createSession: async (label: string): Promise<string> => {
+    const res = await fetch('/api/costs/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label }),
+    });
+    const data = await res.json();
+    return data.id as string;
+  },
+  updateSession: (id: string, amount: number) =>
+    fetch(`/api/costs/session/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount }),
+    }),
+  addToTotal: (delta: number) =>
+    fetch('/api/costs/total', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delta }),
+    }),
 };
 
 const DEFAULT_SYSTEM_INSTRUCTION = `You are an expert Danbooru tagger for Stable Diffusion and ComfyUI. Your task is to generate highly detailed, comprehensive wildcards describing full-body outfits.
@@ -198,7 +224,8 @@ export default function App() {
 
   // ── Session-only state ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
-  const [totalCost, setTotalCost] = useState(0);
+  const [allTimeCost, setAllTimeCost] = useState(0);
+  const [sessionCost, setSessionCost] = useState(0);
   const [lastCallCost, setLastCallCost] = useState(0);
   const [generatedWildcards, setGeneratedWildcards] = useState<WildcardItem[]>([]);
   const [savedWildcards, setSavedWildcards] = useState<WildcardItem[]>([]);
@@ -214,15 +241,30 @@ export default function App() {
   const [previewHover, setPreviewHover] = useState<{ url: string; x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const sessionCostRef = useRef(0); // mirror of sessionCost for use inside async loops
+  const initializedRef = useRef(false); // guard against StrictMode double-mount
 
-  // ── Load wildcards from DB on mount ──────────────────────────────────────
+  // ── Load wildcards from DB on mount ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     Promise.all([dbApi.fetchList('generated'), dbApi.fetchList('saved')])
       .then(([generated, saved]) => {
         setGeneratedWildcards(generated);
         setSavedWildcards(saved);
       })
       .catch(() => { /* server not running */ });
+
+    // Create a new session row and load all-time total
+    const now = new Date();
+    const label = now.toLocaleString();
+    dbApi.createSession(label)
+      .then(id => { sessionIdRef.current = id; })
+      .catch(() => {});
+    dbApi.fetchCosts()
+      .then(({ total }) => setAllTimeCost(total))
+      .catch(() => {});
   }, []);
 
   // ── Poll gallery ─────────────────────────────────────────────────────────
@@ -347,14 +389,19 @@ export default function App() {
           const outputCost = (usage.candidatesTokenCount || 0) * (3.0 / 1000000);
           const batchCost = inputCost + outputCost;
           sessionCost += batchCost;
-          setTotalCost(prev => prev + batchCost);
+          sessionCostRef.current += batchCost;
+          setSessionCost(sessionCostRef.current);
+          setAllTimeCost(prev => prev + batchCost);
+          // Persist to DB (fire-and-forget)
+          if (sessionIdRef.current) dbApi.updateSession(sessionIdRef.current, sessionCostRef.current);
+          dbApi.addToTotal(batchCost);
         }
 
         const text = response.text || '';
         const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, count);
 
         const newItems: WildcardItem[] = lines.map(l => ({
-          id: Math.random().toString(36).substr(2, 9),
+          id: crypto.randomUUID(),
           text: l,
           createdAt: generationTime
         }));
@@ -381,7 +428,7 @@ export default function App() {
   const saveToSavedList = (item: WildcardItem) => {
     if (savedWildcards.find(s => s.text === item.text)) return;
     // New ID so generated and saved rows don't conflict in the DB
-    const newItem: WildcardItem = { ...item, id: Math.random().toString(36).substr(2, 9) };
+    const newItem: WildcardItem = { ...item, id: crypto.randomUUID() };
     setSavedWildcards(prev => [newItem, ...prev]);
     dbApi.add([{ ...newItem, list: 'saved' }]);
   };
@@ -440,7 +487,7 @@ export default function App() {
       const content = e.target?.result as string;
       const lines = content.split('\n').filter(line => line.trim().length > 0);
       const newSaved: WildcardItem[] = lines.map(l => ({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         text: l,
         createdAt: Date.now()
       }));
@@ -883,12 +930,16 @@ export default function App() {
           {/* Cost Summary Section */}
           <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: theme.border, backgroundColor: theme.input }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider opacity-30">Session Cost</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-30">Last Call</span>
               <span className="text-[10px] font-mono font-medium opacity-60">${lastCallCost.toFixed(6)}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider opacity-30">Total Cost</span>
-              <span className="text-[10px] font-mono font-medium opacity-60">${totalCost.toFixed(6)}</span>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-30">This Session</span>
+              <span className="text-[10px] font-mono font-medium opacity-60">${sessionCost.toFixed(6)}</span>
+            </div>
+            <div className="flex items-center justify-between" style={{ borderTop: `1px solid ${theme.border}`, paddingTop: '6px', marginTop: '4px' }}>
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-50">All Time</span>
+              <span className="text-[10px] font-mono font-bold opacity-80">${allTimeCost.toFixed(6)}</span>
             </div>
           </div>
         </aside>
