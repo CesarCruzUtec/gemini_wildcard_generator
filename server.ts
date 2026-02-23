@@ -29,7 +29,9 @@ import path from 'path';
 import Database from 'better-sqlite3';
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT ?? 3001);
+const isProd = process.env.NODE_ENV === 'production';
+const DIST = path.join(process.cwd(), 'dist');
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif']);
 const DB_PATH = path.join(process.cwd(), 'wildcards.db');
 
@@ -262,9 +264,22 @@ app.post('/api/db/reset', (_req, res) => {
   res.json({ ok: true });
 });
 
+// ── Production: serve the Vite-built frontend ───────────────────────────────
+if (isProd) {
+  app.use(express.static(DIST));
+  // SPA fallback — any route that isn't /api/* or /gallery-images/* returns index.html
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(DIST, 'index.html'));
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`Gallery + Wildcards server → http://localhost:${PORT}`);
+  if (isProd) {
+    console.log(`\n  App running → http://localhost:${PORT}`);
+  } else {
+    console.log(`Gallery + Wildcards server → http://localhost:${PORT}`);
+  }
   console.log(`Gallery:  ${getGalleryDir() || '(not configured – set via Settings)'}`);
   console.log(`Database: ${DB_PATH}`);
 });

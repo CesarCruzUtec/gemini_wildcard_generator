@@ -8,6 +8,7 @@
     "server": "tsx server.ts",
     "dev:all": "npx tsx server.ts & npx vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "start": "NODE_ENV=production tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
