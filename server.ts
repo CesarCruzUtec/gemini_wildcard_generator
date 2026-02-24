@@ -69,6 +69,14 @@ db.prepare(`
   VALUES ('__total__', 'total', 'All-Time Total', 0, ?)
 `).run(Date.now());
 
+// Purge zero-cost sessions from previous page loads where nothing was generated.
+// Safe to run unconditionally at startup: the current session is created later
+// by the client, so every zero-amount session row here is genuinely stale.
+db.prepare(`
+  DELETE FROM costs
+  WHERE type = 'session' AND (amount IS NULL OR amount = 0)
+`).run();
+
 // ── Config table ──────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS config (

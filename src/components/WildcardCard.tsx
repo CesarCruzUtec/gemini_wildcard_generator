@@ -118,6 +118,11 @@ export const WildcardCard = React.memo(function WildcardCard({
   useEffect(() => { onSetDefaultPreviewRef.current = onSetDefaultPreview; });
   useEffect(() => { previewSideRef.current = previewSide; });
 
+  // Clear the hover overlay when this card is unmounted (e.g. after deletion).
+  useEffect(() => {
+    return () => { onHoverChangeRef.current(null); };
+  }, []);
+
   // Debounce timer: 1 s after the last scroll, persist the current image as default.
   const defaultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -211,7 +216,7 @@ export const WildcardCard = React.memo(function WildcardCard({
             <ImageIcon className="w-3 h-3" /> {t('card.addPreview')}
           </button>
           <button
-            onClick={onRemove}
+            onClick={() => { onHoverChange(null); onRemove(); }}
             className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors hover:text-red-500"
             style={{ backgroundColor: theme.input, borderColor: theme.border }}
           >

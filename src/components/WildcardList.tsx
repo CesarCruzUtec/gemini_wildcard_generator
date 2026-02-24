@@ -77,6 +77,44 @@ export const WildcardList = React.memo(function WildcardList({
   const safeItems = items ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // ── Re-trigger hover after item removal ───────────────────────────────────
+  // When a card is deleted the DOM node vanishes without a mouseleave, and the
+  // card that slides into its place never gets a mouseenter because the cursor
+  // didn't move. We fix this by:
+  //   1. Tracking the last cursor position inside this list column.
+  //   2. When items shrink, waiting one frame for the virtualizer to re-render,
+  //      then dispatching a real mousemove at that position — the browser will
+  //      re-evaluate which element is under the cursor and fire mouseenter on it.
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const prevItemCountRef = useRef(safeItems.length);
+
+  useEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      mousePosRef.current = { x: e.clientX, y: e.clientY };
+    };
+    el.addEventListener('mousemove', onMove);
+    return () => el.removeEventListener('mousemove', onMove);
+  }, []);
+
+  useEffect(() => {
+    const prev = prevItemCountRef.current;
+    prevItemCountRef.current = safeItems.length;
+    if (safeItems.length >= prev) return; // not a removal
+    const pos = mousePosRef.current;
+    if (!pos) return;
+    // Wait for the virtualizer to settle its DOM, then poke a mousemove.
+    requestAnimationFrame(() => {
+      const target = document.elementFromPoint(pos.x, pos.y);
+      if (target) {
+        target.dispatchEvent(
+          new MouseEvent('mouseover', { bubbles: true, cancelable: true, clientX: pos.x, clientY: pos.y }),
+        );
+      }
+    });
+  }, [safeItems.length]);
+
   // Virtual item count includes a sentinel loader row when there are more pages.
   const count = hasMore ? safeItems.length + 1 : safeItems.length;
 
