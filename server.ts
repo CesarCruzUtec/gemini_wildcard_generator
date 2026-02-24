@@ -47,6 +47,13 @@ db.exec(`
     created_at  INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_wildcards_list_text ON wildcards(list, text);
+  CREATE TABLE IF NOT EXISTS wildcard_previews (
+    id          TEXT PRIMARY KEY,
+    wildcard_id TEXT NOT NULL REFERENCES wildcards(id),
+    url         TEXT NOT NULL,
+    created_at  INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_wp_wildcard_id ON wildcard_previews(wildcard_id);
   CREATE TABLE IF NOT EXISTS costs (
     id         TEXT PRIMARY KEY,
     type       TEXT NOT NULL CHECK(type IN ('session', 'total')),
@@ -78,6 +85,23 @@ try {
   db.exec('DROP INDEX IF EXISTS idx_wildcards_list_pos');
   db.exec('ALTER TABLE wildcards DROP COLUMN position');
 } catch { /* already migrated or column never existed */ }
+
+// Migrate existing preview_url values into the wildcard_previews table so that
+// wildcards created before the multi-preview feature still show their thumbnail.
+{
+  const rows = db.prepare(
+    "SELECT id, preview_url FROM wildcards WHERE preview_url IS NOT NULL AND preview_url != ''"
+  ).all() as { id: string; preview_url: string }[];
+  const insertPreview = db.prepare(
+    'INSERT OR IGNORE INTO wildcard_previews (id, wildcard_id, url, created_at) VALUES (?, ?, ?, ?)'
+  );
+  db.transaction(() => {
+    for (const w of rows) {
+      const already = db.prepare('SELECT 1 FROM wildcard_previews WHERE wildcard_id = ? AND url = ?').get(w.id, w.preview_url);
+      if (!already) insertPreview.run(crypto.randomUUID(), w.id, w.preview_url, Date.now());
+    }
+  })();
+}
 
 function getConfigValue(key: string): string {
   const row = db.prepare(`SELECT value FROM config WHERE key = ?`).get(key) as any;
@@ -157,6 +181,21 @@ const rowToItem = (r: any) => ({
   createdAt: r.created_at as number,
 });
 
+/** Fetch previewUrls for a list of wildcard IDs and return a lookup map. */
+function fetchPreviewsMap(ids: string[]): Record<string, string[]> {
+  if (ids.length === 0) return {};
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT wildcard_id, url FROM wildcard_previews WHERE wildcard_id IN (${placeholders}) ORDER BY created_at ASC`)
+    .all(...ids) as { wildcard_id: string; url: string }[];
+  const map: Record<string, string[]> = {};
+  for (const r of rows) {
+    if (!map[r.wildcard_id]) map[r.wildcard_id] = [];
+    map[r.wildcard_id].push(r.url);
+  }
+  return map;
+}
+
 // ── GET /api/wildcards?list=&limit=&cursor=&q= ───────────────────────────────
 // Cursor-based pagination on `rowid DESC` (newest inserted = first shown).
 // `cursor` is the rowid of the last fetched row; next page uses `rowid < cursor`.
@@ -175,7 +214,9 @@ app.get('/api/wildcards', (req, res) => {
 
   const totalRow = db.prepare('SELECT COUNT(*) as total FROM wildcards WHERE list = ? AND text LIKE ?').get(list, q) as any;
   const total: number = totalRow?.total ?? 0;
-  const items = (rows as any[]).map(rowToItem);
+  const ids = (rows as any[]).map((r) => r.id as string);
+  const previewsMap = fetchPreviewsMap(ids);
+  const items = (rows as any[]).map((r) => ({ ...rowToItem(r), previewUrls: previewsMap[r.id] ?? [] }));
   const nextCursor: number | null = rows.length > 0 ? (rows[rows.length - 1] as any).rowid : null;
 
   res.json({ items, total, nextCursor });
@@ -206,8 +247,31 @@ app.patch('/api/wildcards/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── POST /api/wildcards/:id/previews ─────────────────────────────────────────
+app.post('/api/wildcards/:id/previews', (req, res) => {
+  const { url } = req.body as { url: string };
+  if (!url) return res.status(400).json({ error: 'Missing url' });
+  const previewId = crypto.randomUUID();
+  db.prepare('INSERT INTO wildcard_previews (id, wildcard_id, url, created_at) VALUES (?, ?, ?, ?)').run(previewId, req.params.id, url, Date.now());
+  // Set preview_url on the wildcard only if it had none before
+  db.prepare('UPDATE wildcards SET preview_url = COALESCE(preview_url, ?) WHERE id = ?').run(url, req.params.id);
+  res.json({ ok: true });
+});
+
+// ── DELETE /api/wildcards/:id/previews ───────────────────────────────────────
+app.delete('/api/wildcards/:id/previews', (req, res) => {
+  const { url } = req.body as { url: string };
+  if (!url) return res.status(400).json({ error: 'Missing url' });
+  db.prepare('DELETE FROM wildcard_previews WHERE wildcard_id = ? AND url = ?').run(req.params.id, url);
+  // Update preview_url to oldest remaining, or null if none left
+  const next = db.prepare('SELECT url FROM wildcard_previews WHERE wildcard_id = ? ORDER BY created_at ASC LIMIT 1').get(req.params.id) as any;
+  db.prepare('UPDATE wildcards SET preview_url = ? WHERE id = ?').run(next?.url ?? null, req.params.id);
+  res.json({ ok: true });
+});
+
 // ── DELETE /api/wildcards/:id ─────────────────────────────────────────────────
 app.delete('/api/wildcards/:id', (req, res) => {
+  db.prepare('DELETE FROM wildcard_previews WHERE wildcard_id = ?').run(req.params.id);
   db.prepare('DELETE FROM wildcards WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -216,6 +280,12 @@ app.delete('/api/wildcards/:id', (req, res) => {
 app.delete('/api/wildcards', (req, res) => {
   const list = req.query.list as string;
   if (!['generated', 'saved'].includes(list)) return res.status(400).json({ error: 'Invalid list' });
+  // Remove previews for all wildcards in this list before deleting wildcards
+  db.prepare(`
+    DELETE FROM wildcard_previews WHERE wildcard_id IN (
+      SELECT id FROM wildcards WHERE list = ?
+    )
+  `).run(list);
   db.prepare('DELETE FROM wildcards WHERE list = ?').run(list);
   res.json({ ok: true });
 });
@@ -255,6 +325,7 @@ app.patch('/api/costs/total', (req, res) => {
 // ── POST /api/db/reset ────────────────────────────────────────────────────────
 app.post('/api/db/reset', (_req, res) => {
   db.transaction(() => {
+    db.prepare('DELETE FROM wildcard_previews').run();
     db.prepare('DELETE FROM wildcards').run();
     db.prepare('DELETE FROM costs').run();
     db.prepare(`INSERT INTO costs (id, type, label, amount, created_at) VALUES ('__total__', 'total', 'All-Time Total', 0, ?)`).run(Date.now());

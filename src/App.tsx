@@ -221,17 +221,26 @@ export default function App() {
     dbApi.add([{ ...newItem, list: 'saved' }]);
   }, [savedList.prepend]);
 
-  const setPreviewForWildcard = useCallback((id: string, imageUrl: string, listType: 'generated' | 'saved') => {
-    if (listType === 'generated') generatedList.update(id, { previewUrl: imageUrl });
-    else savedList.update(id, { previewUrl: imageUrl });
-    dbApi.patch(id, { previewUrl: imageUrl });
-  }, [generatedList.update, savedList.update]);
+  const addPreviewForWildcard = useCallback((id: string, url: string, listType: 'generated' | 'saved') => {
+    const listHandle = listType === 'generated' ? generatedList : savedList;
+    const item = listHandle.items.find(i => i.id === id);
+    if (!item) return;
+    const existing = item.previewUrls ?? (item.previewUrl ? [item.previewUrl] : []);
+    if (existing.includes(url)) return; // already linked
+    const newUrls = [...existing, url];
+    listHandle.update(id, { previewUrls: newUrls, previewUrl: item.previewUrl ?? url });
+    dbApi.addPreview(id, url);
+  }, [generatedList, savedList]);
 
-  const removePreviewForWildcard = useCallback((id: string, listType: 'generated' | 'saved') => {
-    if (listType === 'generated') generatedList.update(id, { previewUrl: undefined });
-    else savedList.update(id, { previewUrl: undefined });
-    dbApi.patch(id, { previewUrl: null });
-  }, [generatedList.update, savedList.update]);
+  const removePreviewForWildcard = useCallback((id: string, url: string, listType: 'generated' | 'saved') => {
+    const listHandle = listType === 'generated' ? generatedList : savedList;
+    const item = listHandle.items.find(i => i.id === id);
+    if (!item) return;
+    const existing = item.previewUrls ?? (item.previewUrl ? [item.previewUrl] : []);
+    const newUrls = existing.filter(u => u !== url);
+    listHandle.update(id, { previewUrls: newUrls, previewUrl: newUrls[0] ?? undefined });
+    dbApi.removePreview(id, url);
+  }, [generatedList, savedList]);
 
   const removeSaved = useCallback((id: string) => {
     savedList.remove(id);
@@ -438,7 +447,7 @@ export default function App() {
             currentGalleryImageUrl={currentGalleryImageUrl}
             onCopy={handleCopy}
             onRefine={setRefiningWildcard}
-            onSetPreview={setPreviewForWildcard}
+            onAddPreview={addPreviewForWildcard}
             onRemovePreview={removePreviewForWildcard}
           />
         </div>

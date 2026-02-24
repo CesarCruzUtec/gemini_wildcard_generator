@@ -33,8 +33,8 @@ interface Props {
   currentGalleryImageUrl: string;
   onCopy: (text: string, id: string) => void;
   onRefine: (text: string) => void;
-  onSetPreview: (id: string, url: string, listType: 'generated' | 'saved') => void;
-  onRemovePreview: (id: string, listType: 'generated' | 'saved') => void;
+  onAddPreview: (id: string, url: string, listType: 'generated' | 'saved') => void;
+  onRemovePreview: (id: string, url: string, listType: 'generated' | 'saved') => void;
 }
 
 /**
@@ -61,7 +61,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
   currentGalleryImageUrl,
   onCopy,
   onRefine,
-  onSetPreview,
+  onAddPreview,
   onRemovePreview,
 }: Props) {
   // ── Hover preview state lives here — changes don't bubble up to App ──────
@@ -73,20 +73,20 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
   }, []);
 
   // Stable callbacks so WildcardList can be memoized effectively.
-  const handleSetPreviewGenerated = useCallback(
-    (id: string, url: string) => onSetPreview(id, url, 'generated'),
-    [onSetPreview],
+  const handleAddPreviewGenerated = useCallback(
+    (id: string, url: string) => onAddPreview(id, url, 'generated'),
+    [onAddPreview],
   );
-  const handleSetPreviewSaved = useCallback(
-    (id: string, url: string) => onSetPreview(id, url, 'saved'),
-    [onSetPreview],
+  const handleAddPreviewSaved = useCallback(
+    (id: string, url: string) => onAddPreview(id, url, 'saved'),
+    [onAddPreview],
   );
   const handleRemovePreviewGenerated = useCallback(
-    (id: string) => onRemovePreview(id, 'generated'),
+    (id: string, url: string) => onRemovePreview(id, url, 'generated'),
     [onRemovePreview],
   );
   const handleRemovePreviewSaved = useCallback(
-    (id: string) => onRemovePreview(id, 'saved'),
+    (id: string, url: string) => onRemovePreview(id, url, 'saved'),
     [onRemovePreview],
   );
   const showClearGenerated = useCallback(() => setClearGeneratedConfirm(true), [setClearGeneratedConfirm]);
@@ -124,7 +124,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
           onCopy={onCopy}
           onSave={onSave}
           onRefine={onRefine}
-          onSetPreview={handleSetPreviewGenerated}
+          onAddPreview={handleAddPreviewGenerated}
           onRemovePreview={handleRemovePreviewGenerated}
           onRemove={onRemoveGenerated}
           onHoverChange={handleHoverChange}
@@ -155,7 +155,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
           currentGalleryImageUrl={currentGalleryImageUrl}
           onCopy={onCopy}
           onRefine={onRefine}
-          onSetPreview={handleSetPreviewSaved}
+          onAddPreview={handleAddPreviewSaved}
           onRemovePreview={handleRemovePreviewSaved}
           onRemove={onRemoveSaved}
           onHoverChange={handleHoverChange}

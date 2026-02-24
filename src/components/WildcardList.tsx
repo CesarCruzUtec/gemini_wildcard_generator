@@ -37,8 +37,8 @@ interface Props {
   /** Only for the Generated list */
   onSave?: (item: WildcardItem) => void;
   onRefine: (text: string) => void;
-  onSetPreview: (id: string, url: string) => void;
-  onRemovePreview: (id: string) => void;
+  onAddPreview: (id: string, url: string) => void;
+  onRemovePreview: (id: string, url: string) => void;
   onRemove: (id: string) => void;
   onHoverChange: (url: string | null, side?: 'left' | 'right') => void;
   previewSide?: 'left' | 'right';
@@ -65,7 +65,7 @@ export const WildcardList = React.memo(function WildcardList({
   onCopy,
   onSave,
   onRefine,
-  onSetPreview,
+  onAddPreview,
   onRemovePreview,
   onRemove,
   onHoverChange,
@@ -211,8 +211,8 @@ export const WildcardList = React.memo(function WildcardList({
                         onCopy={() => onCopy(safeItems[vRow.index].text, safeItems[vRow.index].id)}
                         onSave={onSave ? () => onSave(safeItems[vRow.index]) : undefined}
                         onRefine={() => onRefine(safeItems[vRow.index].text)}
-                        onSetPreview={() => onSetPreview(safeItems[vRow.index].id, currentGalleryImageUrl)}
-                        onRemovePreview={() => onRemovePreview(safeItems[vRow.index].id)}
+                        onAddPreview={() => onAddPreview(safeItems[vRow.index].id, currentGalleryImageUrl)}
+                        onRemovePreview={(url) => onRemovePreview(safeItems[vRow.index].id, url)}
                         onRemove={() => onRemove(safeItems[vRow.index].id)}
                         onHoverChange={onHoverChange}
                         previewSide={previewSide}

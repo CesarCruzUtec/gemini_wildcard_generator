@@ -8,6 +8,8 @@ export type WildcardItem = {
   text: string;
   createdAt: number;
   previewUrl?: string;
+  /** All preview images linked to this wildcard, oldest first. */
+  previewUrls?: string[];
 };
 
 export type Theme = {

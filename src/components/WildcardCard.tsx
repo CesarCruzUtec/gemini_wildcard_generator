@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Save, Sparkles, Image as ImageIcon, Trash2, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
@@ -23,8 +23,10 @@ interface Props {
   /** Present only on Generated cards */
   onSave?: () => void;
   onRefine: () => void;
-  onSetPreview: () => void;
-  onRemovePreview: () => void;
+  /** Adds currentGalleryImageUrl to the wildcard's preview list. */
+  onAddPreview: () => void;
+  /** Removes a specific preview URL from the wildcard's preview list. */
+  onRemovePreview: (url: string) => void;
   onRemove: () => void;
   onHoverChange: (url: string | null, side?: 'left' | 'right') => void;
   /** Which side of the card to show the preview popup. Default: 'right' */
@@ -42,7 +44,7 @@ export const WildcardCard = React.memo(function WildcardCard({
   onCopy,
   onSave,
   onRefine,
-  onSetPreview,
+  onAddPreview,
   onRemovePreview,
   onRemove,
   onHoverChange,
@@ -50,7 +52,58 @@ export const WildcardCard = React.memo(function WildcardCard({
 }: Props) {
   const { t } = useTranslation();
   const isCopied = copiedId === item.id;
-  const hasPreview = Boolean(item.previewUrl);
+
+  // ── Multi-preview cycling ──────────────────────────────────────────────────
+  const previewUrls: string[] = item.previewUrls ?? (item.previewUrl ? [item.previewUrl] : []);
+  const hasPreview = previewUrls.length > 0;
+
+  // Current displayed index — kept in refs so wheel handler never goes stale.
+  const previewIndexRef = useRef(0);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  // Clamp index when the list shrinks (e.g. after removal).
+  useEffect(() => {
+    if (previewUrls.length === 0) {
+      previewIndexRef.current = 0;
+      setPreviewIndex(0);
+    } else if (previewIndexRef.current >= previewUrls.length) {
+      const clamped = previewUrls.length - 1;
+      previewIndexRef.current = clamped;
+      setPreviewIndex(clamped);
+    }
+  }, [previewUrls.length]);
+
+  const currentPreviewUrl = previewUrls[previewIndex] ?? null;
+
+  // Refs to latest values so a single stable wheel handler can use them.
+  const previewUrlsRef = useRef(previewUrls);
+  const onHoverChangeRef = useRef(onHoverChange);
+  const previewSideRef = useRef(previewSide);
+  useEffect(() => { previewUrlsRef.current = previewUrls; });
+  useEffect(() => { onHoverChangeRef.current = onHoverChange; });
+  useEffect(() => { previewSideRef.current = previewSide; });
+
+  // Thumbnail ref — we attach a non-passive wheel listener so we can
+  // call preventDefault() and stop the scroll from reaching the wildcard list.
+  const thumbnailRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = thumbnailRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const urls = previewUrlsRef.current;
+      if (urls.length <= 1) return;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      const newIdx = (previewIndexRef.current + dir + urls.length) % urls.length;
+      previewIndexRef.current = newIdx;
+      setPreviewIndex(newIdx);
+      onHoverChangeRef.current(urls[newIdx], previewSideRef.current);
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []); // stable — uses refs for latest values
 
   return (
     <div
@@ -64,7 +117,7 @@ export const WildcardCard = React.memo(function WildcardCard({
         '--tw-ring-color': theme.accent,
       } as React.CSSProperties}
       onMouseEnter={() => {
-        if (item.previewUrl) onHoverChange(item.previewUrl, previewSide);
+        if (currentPreviewUrl) onHoverChange(currentPreviewUrl, previewSide);
       }}
       onMouseLeave={() => onHoverChange(null)}
     >
@@ -100,7 +153,7 @@ export const WildcardCard = React.memo(function WildcardCard({
             <Sparkles className="w-3 h-3" /> {t('card.refine')}
           </button>
           <button
-            onClick={onSetPreview}
+            onClick={onAddPreview}
             disabled={!galleryEnabled || galleryEmpty}
             className="flex items-center gap-1 px-2 py-1 border rounded-md text-[10px] font-medium transition-colors disabled:opacity-20"
             style={{
@@ -109,7 +162,7 @@ export const WildcardCard = React.memo(function WildcardCard({
               color: hasPreview ? (theme.id === 'dark' ? '#000' : '#fff') : undefined,
             }}
           >
-            <ImageIcon className="w-3 h-3" /> {t('card.preview')}
+            <ImageIcon className="w-3 h-3" /> {t('card.addPreview')}
           </button>
           <button
             onClick={onRemove}
@@ -121,22 +174,43 @@ export const WildcardCard = React.memo(function WildcardCard({
         </div>
       </div>
 
-      {/* Right: full-height preview thumbnail */}
+      {/* Right: full-height preview thumbnail — scroll to cycle through previews */}
       {hasPreview && (
         <div
-          className="relative shrink-0 w-20 border-l"
+          ref={thumbnailRef}
+          className="relative shrink-0 w-20 border-l select-none"
           style={{ borderColor: theme.border }}
+          title={previewUrls.length > 1 ? `${previewIndex + 1} / ${previewUrls.length} — scroll to cycle` : undefined}
         >
           <img
-            src={item.previewUrl}
+            src={currentPreviewUrl!}
             className="absolute inset-0 w-full h-full object-cover"
             alt="preview"
+            draggable={false}
           />
-          {/* Remove preview button */}
+
+          {/* Multiple-preview indicator */}
+          {previewUrls.length > 1 && (
+            <div className="absolute bottom-1 left-1 right-1 flex justify-center gap-0.5 pointer-events-none">
+              {previewUrls.map((_, i) => (
+                <span
+                  key={i}
+                  className="block rounded-full transition-all"
+                  style={{
+                    width: i === previewIndex ? 6 : 4,
+                    height: 4,
+                    backgroundColor: i === previewIndex ? '#fff' : 'rgba(255,255,255,0.4)',
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Remove current preview button */}
           <button
-            onClick={(e) => { e.stopPropagation(); onRemovePreview(); }}
+            onClick={(e) => { e.stopPropagation(); onRemovePreview(currentPreviewUrl!); }}
             className="absolute top-1 right-1 p-0.5 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Remove preview"
+            title="Remove this preview"
           >
             <X className="w-3 h-3" />
           </button>

@@ -51,6 +51,21 @@ export const dbApi = {
   clearList: (list: 'generated' | 'saved') =>
     fetch(`/api/wildcards?list=${list}`, { method: 'DELETE' }),
 
+  // ── Wildcard previews ──────────────────────────────────────────────────────
+  addPreview: (wildcardId: string, url: string) =>
+    fetch(`/api/wildcards/${wildcardId}/previews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    }),
+
+  removePreview: (wildcardId: string, url: string) =>
+    fetch(`/api/wildcards/${wildcardId}/previews`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    }),
+
   // ── Costs ──────────────────────────────────────────────────────────────────
   fetchCosts: async (): Promise<{ total: number }> => {
     const res = await fetch('/api/costs');
