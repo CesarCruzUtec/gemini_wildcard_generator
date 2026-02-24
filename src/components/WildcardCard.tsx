@@ -27,6 +27,8 @@ interface Props {
   onAddPreview: () => void;
   /** Removes a specific preview URL from the wildcard's preview list. */
   onRemovePreview: (url: string) => void;
+  /** Persists the given URL as the default preview_url in the DB. */
+  onSetDefaultPreview: (url: string) => void;
   onRemove: () => void;
   onHoverChange: (url: string | null, side?: 'left' | 'right') => void;
   /** Which side of the card to show the preview popup. Default: 'right' */
@@ -46,6 +48,7 @@ export const WildcardCard = React.memo(function WildcardCard({
   onRefine,
   onAddPreview,
   onRemovePreview,
+  onSetDefaultPreview,
   onRemove,
   onHoverChange,
   previewSide = 'right',
@@ -57,31 +60,66 @@ export const WildcardCard = React.memo(function WildcardCard({
   const previewUrls: string[] = item.previewUrls ?? (item.previewUrl ? [item.previewUrl] : []);
   const hasPreview = previewUrls.length > 0;
 
-  // Current displayed index — kept in refs so wheel handler never goes stale.
-  const previewIndexRef = useRef(0);
-  const [previewIndex, setPreviewIndex] = useState(0);
+  // Start at the index that matches the persisted default (preview_url), or 0.
+  const defaultIndex = item.previewUrl
+    ? Math.max(0, previewUrls.indexOf(item.previewUrl))
+    : 0;
 
-  // Clamp index when the list shrinks (e.g. after removal).
+  // Current displayed index — kept in refs so wheel handler never goes stale.
+  const previewIndexRef = useRef(defaultIndex);
+  const [previewIndex, setPreviewIndex] = useState(defaultIndex);
+
+  // Track previous length to detect additions vs. removals.
+  const prevLengthRef = useRef(previewUrls.length);
+
   useEffect(() => {
+    const prev = prevLengthRef.current;
+    prevLengthRef.current = previewUrls.length;
+
     if (previewUrls.length === 0) {
+      // All previews removed.
       previewIndexRef.current = 0;
       setPreviewIndex(0);
+    } else if (previewUrls.length > prev) {
+      // A new preview was added — jump to it (always appended at the end).
+      const newIdx = previewUrls.length - 1;
+      previewIndexRef.current = newIdx;
+      setPreviewIndex(newIdx);
+      // Also update the big preview overlay immediately.
+      onHoverChangeRef.current(previewUrls[newIdx], previewSideRef.current);
     } else if (previewIndexRef.current >= previewUrls.length) {
+      // A preview was removed and the index is now out of bounds — clamp.
       const clamped = previewUrls.length - 1;
       previewIndexRef.current = clamped;
       setPreviewIndex(clamped);
     }
-  }, [previewUrls.length]);
+  }, [previewUrls.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync to the persisted default whenever item.previewUrl changes externally
+  // (e.g. data refresh) without the list length changing.
+  useEffect(() => {
+    if (!item.previewUrl) return;
+    const idx = previewUrls.indexOf(item.previewUrl);
+    if (idx !== -1 && idx !== previewIndexRef.current) {
+      previewIndexRef.current = idx;
+      setPreviewIndex(idx);
+    }
+  }, [item.previewUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentPreviewUrl = previewUrls[previewIndex] ?? null;
 
   // Refs to latest values so a single stable wheel handler can use them.
   const previewUrlsRef = useRef(previewUrls);
   const onHoverChangeRef = useRef(onHoverChange);
+  const onSetDefaultPreviewRef = useRef(onSetDefaultPreview);
   const previewSideRef = useRef(previewSide);
   useEffect(() => { previewUrlsRef.current = previewUrls; });
   useEffect(() => { onHoverChangeRef.current = onHoverChange; });
+  useEffect(() => { onSetDefaultPreviewRef.current = onSetDefaultPreview; });
   useEffect(() => { previewSideRef.current = previewSide; });
+
+  // Debounce timer: 1 s after the last scroll, persist the current image as default.
+  const defaultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Thumbnail ref — we attach a non-passive wheel listener so we can
   // call preventDefault() and stop the scroll from reaching the wildcard list.
@@ -100,9 +138,17 @@ export const WildcardCard = React.memo(function WildcardCard({
       previewIndexRef.current = newIdx;
       setPreviewIndex(newIdx);
       onHoverChangeRef.current(urls[newIdx], previewSideRef.current);
+      // Reset the 1-second debounce for persisting the default preview.
+      if (defaultTimerRef.current) clearTimeout(defaultTimerRef.current);
+      defaultTimerRef.current = setTimeout(() => {
+        onSetDefaultPreviewRef.current(previewUrlsRef.current[previewIndexRef.current]);
+      }, 1000);
     };
     el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
+    return () => {
+      el.removeEventListener('wheel', handler);
+      if (defaultTimerRef.current) clearTimeout(defaultTimerRef.current);
+    };
   }, []); // stable — uses refs for latest values
 
   return (

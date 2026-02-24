@@ -35,6 +35,7 @@ interface Props {
   onRefine: (text: string) => void;
   onAddPreview: (id: string, url: string, listType: 'generated' | 'saved') => void;
   onRemovePreview: (id: string, url: string, listType: 'generated' | 'saved') => void;
+  onSetDefaultPreview: (id: string, url: string, listType: 'generated' | 'saved') => void;
 }
 
 /**
@@ -63,6 +64,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
   onRefine,
   onAddPreview,
   onRemovePreview,
+  onSetDefaultPreview,
 }: Props) {
   // ── Hover preview state lives here — changes don't bubble up to App ──────
   const [previewHover, setPreviewHover] = useState<{ url: string; side: 'left' | 'right' } | null>(null);
@@ -88,6 +90,14 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
   const handleRemovePreviewSaved = useCallback(
     (id: string, url: string) => onRemovePreview(id, url, 'saved'),
     [onRemovePreview],
+  );
+  const handleSetDefaultPreviewGenerated = useCallback(
+    (id: string, url: string) => onSetDefaultPreview(id, url, 'generated'),
+    [onSetDefaultPreview],
+  );
+  const handleSetDefaultPreviewSaved = useCallback(
+    (id: string, url: string) => onSetDefaultPreview(id, url, 'saved'),
+    [onSetDefaultPreview],
   );
   const showClearGenerated = useCallback(() => setClearGeneratedConfirm(true), [setClearGeneratedConfirm]);
   const cancelClearGenerated = useCallback(() => setClearGeneratedConfirm(false), [setClearGeneratedConfirm]);
@@ -126,6 +136,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
           onRefine={onRefine}
           onAddPreview={handleAddPreviewGenerated}
           onRemovePreview={handleRemovePreviewGenerated}
+          onSetDefaultPreview={handleSetDefaultPreviewGenerated}
           onRemove={onRemoveGenerated}
           onHoverChange={handleHoverChange}
           previewSide="right"
@@ -157,6 +168,7 @@ export const WildcardsColumns = React.memo(function WildcardsColumns({
           onRefine={onRefine}
           onAddPreview={handleAddPreviewSaved}
           onRemovePreview={handleRemovePreviewSaved}
+          onSetDefaultPreview={handleSetDefaultPreviewSaved}
           onRemove={onRemoveSaved}
           onHoverChange={handleHoverChange}
           previewSide="left"

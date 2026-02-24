@@ -39,6 +39,7 @@ interface Props {
   onRefine: (text: string) => void;
   onAddPreview: (id: string, url: string) => void;
   onRemovePreview: (id: string, url: string) => void;
+  onSetDefaultPreview: (id: string, url: string) => void;
   onRemove: (id: string) => void;
   onHoverChange: (url: string | null, side?: 'left' | 'right') => void;
   previewSide?: 'left' | 'right';
@@ -67,6 +68,7 @@ export const WildcardList = React.memo(function WildcardList({
   onRefine,
   onAddPreview,
   onRemovePreview,
+  onSetDefaultPreview,
   onRemove,
   onHoverChange,
   previewSide = 'right',
@@ -213,6 +215,7 @@ export const WildcardList = React.memo(function WildcardList({
                         onRefine={() => onRefine(safeItems[vRow.index].text)}
                         onAddPreview={() => onAddPreview(safeItems[vRow.index].id, currentGalleryImageUrl)}
                         onRemovePreview={(url) => onRemovePreview(safeItems[vRow.index].id, url)}
+                        onSetDefaultPreview={(url) => onSetDefaultPreview(safeItems[vRow.index].id, url)}
                         onRemove={() => onRemove(safeItems[vRow.index].id)}
                         onHoverChange={onHoverChange}
                         previewSide={previewSide}

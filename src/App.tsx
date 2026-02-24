@@ -242,6 +242,12 @@ export default function App() {
     dbApi.removePreview(id, url);
   }, [generatedList, savedList]);
 
+  const setDefaultPreviewForWildcard = useCallback((id: string, url: string, listType: 'generated' | 'saved') => {
+    const listHandle = listType === 'generated' ? generatedList : savedList;
+    listHandle.update(id, { previewUrl: url });
+    dbApi.patch(id, { previewUrl: url });
+  }, [generatedList, savedList]);
+
   const removeSaved = useCallback((id: string) => {
     savedList.remove(id);
     dbApi.remove(id);
@@ -449,6 +455,7 @@ export default function App() {
             onRefine={setRefiningWildcard}
             onAddPreview={addPreviewForWildcard}
             onRemovePreview={removePreviewForWildcard}
+            onSetDefaultPreview={setDefaultPreviewForWildcard}
           />
         </div>
       </main>

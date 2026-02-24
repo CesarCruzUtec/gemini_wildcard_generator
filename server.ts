@@ -227,12 +227,21 @@ app.post('/api/wildcards', (req, res) => {
   const { items } = req.body as { items: any[] };
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'No items' });
 
-  const stmt = db.prepare(
+  const stmtWildcard = db.prepare(
     'INSERT OR REPLACE INTO wildcards (id, text, list, preview_url, created_at) VALUES (?, ?, ?, ?, ?)'
   );
+  const stmtPreview = db.prepare(
+    'INSERT OR IGNORE INTO wildcard_previews (id, wildcard_id, url, created_at) VALUES (?, ?, ?, ?)'
+  );
   db.transaction(() => {
+    const now = Date.now();
     items.forEach((item) => {
-      stmt.run(item.id, item.text, item.list, item.previewUrl ?? null, item.createdAt);
+      stmtWildcard.run(item.id, item.text, item.list, item.previewUrl ?? null, item.createdAt);
+      // Also persist preview URLs so they survive a page reload.
+      const previewUrls: string[] = Array.isArray(item.previewUrls) ? item.previewUrls : [];
+      previewUrls.forEach((url: string) => {
+        stmtPreview.run(crypto.randomUUID(), item.id, url, now);
+      });
     });
   })();
   res.json({ ok: true });
