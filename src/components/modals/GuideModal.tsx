@@ -134,6 +134,8 @@ export function GuideModal({ theme, show, onClose }: Props) {
                     <p><Trans i18nKey="guide.step6.p2" components={transComponents} /></p>
                     <p><Trans i18nKey="guide.step6.p3" components={transComponents} /></p>
                     <p><Trans i18nKey="guide.step6.p4" components={transComponents} /></p>
+                    <p><Trans i18nKey="guide.step6.p5" components={transComponents} /></p>
+                    <p><Trans i18nKey="guide.step6.p6" components={transComponents} /></p>
                   </Step>
 
                   {divider}

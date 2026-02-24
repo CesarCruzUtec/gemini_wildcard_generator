@@ -118,9 +118,11 @@
     "step6": {
       "title": "Galería y vistas previas",
       "p1": "Si se configura una carpeta de galería, un panel en la barra lateral muestra todas las imágenes. Usa las <b>flechas</b> para navegar o el icono de <b>actualizar</b> para recargar.",
-      "p2": "Navega a la imagen que deseas asociar con un wildcard y haz clic en <b>Vista previa</b> en esa tarjeta. Aparecerá una miniatura en el lado derecho de la tarjeta.",
-      "p3": "Pasa el cursor sobre una tarjeta con vista previa — la imagen completa aparece como superposición difuminada en la columna opuesta.",
-      "p4": "Haz clic en el botón <b>×</b> en la miniatura para eliminar el enlace de vista previa de esa tarjeta."
+      "p2": "Navega a la imagen que deseas asociar con un wildcard y haz clic en <b>Agregar vista previa</b> en esa tarjeta. La miniatura aparecerá en el lado derecho y la imagen se agrega a la lista de vistas previas de ese wildcard. Puedes agregar <b>tantas vistas previas como desees</b> — cada clic con una imagen diferente seleccionada agrega una nueva.",
+      "p3": "<b>Desplaza la rueda del ratón sobre una miniatura</b> para recorrer todas sus imágenes. Pequeños puntos en la parte inferior muestran la posición actual en la lista, y la <b>vista previa grande</b> en la columna opuesta se actualiza en tiempo real mientras navegas.",
+      "p4": "Cuando dejas de desplazarte durante <b>1 segundo</b>, la imagen actual se guarda automáticamente como <b>vista previa predeterminada</b> — será la que se muestre al recargar la página.",
+      "p5": "Pasa el cursor sobre una tarjeta con vista previa — la imagen completa aparece como superposición difuminada en la columna opuesta sin cubrir la tarjeta que estás viendo.",
+      "p6": "Haz clic en el botón <b>×</b> en la miniatura para eliminar solo la imagen actualmente mostrada de la lista. Cuando se elimina la última vista previa, la miniatura desaparece por completo."
     },
     "step7": {
       "title": "Visor de galería",

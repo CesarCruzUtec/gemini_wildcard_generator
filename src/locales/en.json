@@ -118,9 +118,11 @@
     "step6": {
       "title": "Gallery & image previews",
       "p1": "If a gallery folder is configured, a panel in the left sidebar shows all images in that folder. Use the <b>arrows</b> to browse or click the <b>refresh</b> icon after adding new images.",
-      "p2": "Navigate to an image you want to associate with a wildcard, then click <b>Preview</b> on that card. A thumbnail will appear on the right side of the card.",
-      "p3": "Hover over a card that has a preview — the full image appears as a blurred overlay on the opposite column so it doesn't cover the card you're looking at.",
-      "p4": "Click the <b>×</b> button on a thumbnail to remove the preview link from that card."
+      "p2": "Navigate to an image you want to associate with a wildcard, then click <b>Add Preview</b> on that card. The thumbnail appears on the right side of the card and the image is added to that wildcard's preview list. You can add <b>as many previews as you like</b> — each click with a different gallery image selected adds another one.",
+      "p3": "<b>Scroll up or down on a thumbnail</b> to cycle through all its preview images. Small dots at the bottom of the thumbnail show the current position in the list, and the <b>full-size overlay</b> on the opposite column updates in real time as you scroll.",
+      "p4": "After scrolling stops for <b>1 second</b>, the image you landed on is automatically saved as the <b>default preview</b> — it will be the one shown when you reload the page.",
+      "p5": "Hover over any card that has a preview — the full image appears as a blurred overlay on the opposite column so it doesn't cover the card you're looking at.",
+      "p6": "Click the <b>×</b> button on the thumbnail to remove only the currently displayed image from the list. When the last preview is removed the thumbnail disappears entirely."
     },
     "step7": {
       "title": "Gallery lightbox",
